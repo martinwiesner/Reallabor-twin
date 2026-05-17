@@ -17,16 +17,20 @@ export default function controlPlugin() {
       const wss = new WebSocketServer({ port: CONTROL_PORT });
       const clients = new Set();
 
-      wss.on('connection', (ws) => {
+      wss.on('connection', (ws, req) => {
         clients.add(ws);
+        console.log(`[ControlWS] Client connected from ${req.socket.remoteAddress} (total: ${clients.size})`);
 
-        ws.on('close', () => clients.delete(ws));
+        ws.on('close', () => {
+          clients.delete(ws);
+          console.log(`[ControlWS] Client disconnected (remaining: ${clients.size})`);
+        });
 
         ws.on('message', (data) => {
           const raw = data.toString();
-          clients.forEach(c => {
-            if (c !== ws && c.readyState === 1) c.send(raw);
-          });
+          const targets = [...clients].filter(c => c !== ws && c.readyState === 1);
+          console.log(`[ControlWS] Relaying to ${targets.length} client(s): ${raw.slice(0, 80)}`);
+          targets.forEach(c => c.send(raw));
         });
 
         ws.on('error', () => clients.delete(ws));
