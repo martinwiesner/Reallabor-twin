@@ -339,6 +339,30 @@ export default function App() {
   useEffect(() => { const iv = setInterval(() => setTick(t => t + 1), 1500); return () => clearInterval(iv); }, []);
   useEffect(() => { setHist(h => [...h.slice(-30), { ...genEnergy(tick, params, pvDachOn, pvFreiraumOn), t: tick }]); }, [tick, params, pvDachOn, pvFreiraumOn]);
 
+  // MCP control channel — receives design commands from the meeting assistant
+  useEffect(() => {
+    const ws = new WebSocket('ws://localhost:5175');
+    ws.onmessage = (e) => {
+      try {
+        const cmd = JSON.parse(e.data);
+        if (cmd.action === 'toggle_walls' && Array.isArray(cmd.wallIds)) {
+          const active = typeof cmd.active === 'boolean' ? cmd.active : false;
+          setWallStates(prev => {
+            const next = { ...prev };
+            cmd.wallIds.forEach(id => { if (next[id]) next[id] = { ...next[id], active }; });
+            return next;
+          });
+          ws.send(JSON.stringify({ type: 'ack', action: 'toggle_walls', ok: true }));
+        } else if (cmd.action === 'set_floor' && typeof cmd.floor === 'string') {
+          setSel(cmd.floor);
+          ws.send(JSON.stringify({ type: 'ack', action: 'set_floor', ok: true }));
+        }
+      } catch {}
+    };
+    ws.onerror = () => {};
+    return () => { try { ws.close(); } catch {} };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const cur = hist[hist.length - 1] || { pvDach:0,pvFrei:0,pvTotal:0,con42:0,con52:0,conTotal:0,elStored:0,elSOC:0,thStored:0,thSOC:0,grid:0,label:"–" };
   const fl = FLOORS.find(f => f.id === sel);
   const sp = (id, v) => setParams(p => ({ ...p, [id]: parseFloat(v) }));
