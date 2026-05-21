@@ -1,8 +1,20 @@
 import { useState, useEffect } from "react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
+// CI palette tokens — kept as JS constants so we can pass them to SVG/Recharts attributes
+// where CSS variables wouldn't resolve. Mirrors src/theme.css.
+const CI = {
+  coreBlue:      "#164194",
+  brightHorizon: "#3973B9",
+  icyBreeze:     "#A2D3F3",
+  softSky:       "#D4E8F7",
+  pulseRed:      "#EA5738",
+  cloudGray:     "#E3E3E3",
+  urbanAsh:      "#878787",
+  deepVoid:      "#000000",
+};
+
 // SVG viewBox 0 0 500 250, outer rect x=5 y=5 w=490 h=240, strokeWidth=8 → inner edge ≈ 9/491/9/241
-// 1 SVG unit ≈ 5 cm (building ~25m × ~12m)
 const EXT_SIDES = [
   { id: "nord", label: "Nord", x1: 9,   y1: 9,   x2: 491, y2: 9,   axis: "h", inward: 1  },
   { id: "sued", label: "Süd",  x1: 9,   y1: 241, x2: 491, y2: 241, axis: "h", inward: -1 },
@@ -11,17 +23,19 @@ const EXT_SIDES = [
 ];
 const INIT_EXT_WALLS = Object.fromEntries(EXT_SIDES.map(s => [s.id, { typeId: "aw1", bufferDepth: 0 }]));
 
+// Floor palette — a top-down blue Verlauf (Core Blue → Soft Sky) with Urban Ash + Deep Void
+// at the lower levels. Reads as sun-on-roof → ground.
 const FLOORS = [
-  { id: "dach", name: "Dach · PV", color: "#22d3ee", short: "D" },
-  { id: "4og", name: "4. OG", color: "#c084fc", short: "4" },
-  { id: "3og", name: "3. OG", color: "#a78bfa", short: "3" },
-  { id: "2og", name: "2. OG", color: "#818cf8", short: "2" },
-  { id: "1og", name: "1. OG", color: "#34d399", short: "1" },
-  { id: "eg", name: "EG", color: "#fbbf24", short: "E" },
+  { id: "dach", name: "Dach · PV",  color: CI.coreBlue,      short: "D" },
+  { id: "4og",  name: "4. OG",       color: CI.brightHorizon, short: "4" },
+  { id: "3og",  name: "3. OG",       color: CI.icyBreeze,     short: "3" },
+  { id: "2og",  name: "2. OG",       color: CI.softSky,       short: "2" },
+  { id: "1og",  name: "1. OG",       color: CI.urbanAsh,      short: "1" },
+  { id: "eg",   name: "EG",          color: CI.deepVoid,      short: "E" },
 ];
 
 const DEFAULT_WALL_TYPES = [
-  { id: "aw1", name: "Außenwand (Bestand)", isExterior: true, color: "#f59e0b",
+  { id: "aw1", name: "Außenwand (Bestand)", isExterior: true, color: CI.coreBlue,
     layers: [
       { name: "Kalkzementputz", thickness: 15, density: 1800, gwp: 0.14, voc: 5, lambda: 0.87 },
       { name: "Holzfaserdämmung", thickness: 200, density: 160, gwp: -0.80, voc: 2, lambda: 0.04 },
@@ -29,7 +43,7 @@ const DEFAULT_WALL_TYPES = [
       { name: "Lehmputz", thickness: 15, density: 1600, gwp: 0.02, voc: 0, lambda: 0.91 },
     ],
   },
-  { id: "iw1", name: "Innenwand (Lehm-Ständer)", isExterior: false, color: "#a78bfa",
+  { id: "iw1", name: "Innenwand (Lehm-Ständer)", isExterior: false, color: CI.urbanAsh,
     layers: [
       { name: "Lehmputz", thickness: 15, density: 1600, gwp: 0.02, voc: 0, lambda: 0.91 },
       { name: "Holzständer + Dämmung", thickness: 100, density: 80, gwp: 0.08, voc: 1, lambda: 0.045 },
@@ -105,6 +119,26 @@ function genEnergy(tick, p, pvDachOn, pvFreiraumOn) {
   };
 }
 
+/* ═══ BRAND MARK ═══ */
+// 4-circle Signet — Handbuch arrangement (3 wheels + 1 carriage top-right).
+const Signet = ({ size = 20, color = "currentColor" }) => (
+  <svg width={size} height={size} viewBox="0 0 64 64" aria-label="RZZ Signet" role="img">
+    <circle cx="16" cy="44" r="12" fill={color} />
+    <circle cx="40" cy="44" r="12" fill={color} />
+    <circle cx="28" cy="20" r="12" fill={color} />
+    <circle cx="52" cy="20" r="12" fill={color} />
+  </svg>
+);
+
+const ThemeToggle = ({ theme, setTheme }) => (
+  <button
+    onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+    title={theme === "light" ? "Dunkelmodus" : "Hellmodus"}
+    style={{ background: "transparent", border: "1px solid var(--rzz-border)", borderRadius: 4, padding: "3px 7px", color: "var(--rzz-text)", cursor: "pointer", fontSize: 11, lineHeight: 1, fontFamily: "inherit" }}>
+    {theme === "light" ? "☾" : "☀"}
+  </button>
+);
+
 /* ═══ COMPONENTS ═══ */
 const Gauge = ({ value, max, label, unit, color, warn }) => {
   const pct = Math.min(100, (value / max) * 100);
@@ -113,37 +147,38 @@ const Gauge = ({ value, max, label, unit, color, warn }) => {
     <div style={{ textAlign: "center", minWidth: 56 }}>
       <div style={{ position: "relative", width: 46, height: 46, margin: "0 auto" }}>
         <svg viewBox="0 0 36 36" style={{ transform: "rotate(-90deg)" }}>
-          <circle cx="18" cy="18" r="15.9" fill="none" stroke="#1e293b" strokeWidth="3" />
-          <circle cx="18" cy="18" r="15.9" fill="none" stroke={bad ? "#ef4444" : color} strokeWidth="3"
+          <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--rzz-border)" strokeWidth="3" />
+          <circle cx="18" cy="18" r="15.9" fill="none" stroke={bad ? CI.pulseRed : color} strokeWidth="3"
             strokeDasharray={`${pct} ${100 - pct}`} strokeLinecap="round" style={{ transition: "stroke-dasharray 0.8s" }} />
         </svg>
-        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: bad ? "#ef4444" : "#e2e8f0" }}>{value}</div>
+        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: bad ? CI.pulseRed : "var(--rzz-text)" }}>{value}</div>
       </div>
-      <div style={{ fontSize: 7, color: "#94a3b8", marginTop: 1 }}>{label}</div>
-      <div style={{ fontSize: 6, color: "#64748b" }}>{unit}</div>
+      <div style={{ fontSize: 9, color: "var(--rzz-text-dim)", marginTop: 2, fontWeight: 600 }}>{label}</div>
+      <div style={{ fontSize: 8, color: "var(--rzz-text-mute)" }}>{unit}</div>
     </div>
   );
 };
 
-const Box = ({ children, style }) => <div style={{ background: "#0f172a", borderRadius: 8, padding: 10, border: "1px solid #1e293b", ...style }}>{children}</div>;
-const Lbl = ({ children, style }) => <div style={{ fontSize: 10, color: "#475569", marginBottom: 6, fontWeight: 600, letterSpacing: 1, ...style }}>{children}</div>;
+const Box = ({ children, style }) => <div style={{ background: "var(--rzz-surface)", borderRadius: 8, padding: 10, border: "1px solid var(--rzz-border)", ...style }}>{children}</div>;
+const Lbl = ({ children, style }) => <div style={{ fontSize: 10, color: "var(--rzz-text-dim)", marginBottom: 6, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", ...style }}>{children}</div>;
 
 /* ═══ FLOOR PLANS ═══ */
 function EGPlan({ tick }) {
+  const c = CI.coreBlue;
   return (
-    <svg viewBox="0 0 500 250" style={{ width: "100%", background: "#080e1a" }}>
-      <rect x="5" y="5" width="490" height="240" fill="none" stroke="#fbbf24" strokeWidth="8" />
-      <rect x="120" y="8" width="80" height="100" fill="none" stroke="#fbbf24" strokeWidth="5" />
-      {[30,40,50,60,70].map(y=><line key={y} x1="135" y1={y} x2="175" y2={y} stroke="#fbbf2444" strokeWidth=".8"/>)}
-      <rect x="155" y="72" width="20" height="20" fill="none" stroke="#fbbf24" strokeWidth="2" />
-      <path d="M120 45 A20 20 0 0 1 100 65" fill="none" stroke="#fbbf2444" strokeWidth="1"/>
-      {[50,90,220,270,320,370,420].map((x,i)=><rect key={i} x={x} y="2" width="30" height="6" fill="#22d3ee22" stroke="#22d3ee44" strokeWidth=".5" rx="1"/>)}
-      {[50,120,190,260,330,400,460].map((x,i)=><rect key={`b${i}`} x={x} y="242" width="30" height="6" fill="#22d3ee22" stroke="#22d3ee44" strokeWidth=".5" rx="1"/>)}
-      {[40,100,160].map((y,i)=><rect key={`l${i}`} x="2" y={y} width="6" height="25" fill="#22d3ee22" stroke="#22d3ee44" strokeWidth=".5" rx="1"/>)}
-      {[40,100,160].map((y,i)=><rect key={`r${i}`} x="492" y={y} width="6" height="25" fill="#22d3ee22" stroke="#22d3ee44" strokeWidth=".5" rx="1"/>)}
-      {[160,250,340,430].flatMap(x=>[80,150,220].map(y=><rect key={`${x}${y}`} x={x-4} y={y-4} width="8" height="8" fill="#fbbf24" opacity=".6"/>))}
-      <circle cx="300" cy="130" r="4" fill="#22c55e" opacity={.5+.5*Math.sin(tick*.3)}><animate attributeName="r" values="3;5;3" dur="2s" repeatCount="indefinite"/></circle>
-      <text x="300" y="200" textAnchor="middle" fill="#fbbf2433" fontSize="12">GEB. 42 · FOYER / AUSSTELLUNG</text>
+    <svg viewBox="0 0 500 250" style={{ width: "100%", background: "var(--rzz-surface-inset)" }}>
+      <rect x="5" y="5" width="490" height="240" fill="none" stroke={c} strokeWidth="8" />
+      <rect x="120" y="8" width="80" height="100" fill="none" stroke={c} strokeWidth="5" />
+      {[30,40,50,60,70].map(y=><line key={y} x1="135" y1={y} x2="175" y2={y} stroke={c+"44"} strokeWidth=".8"/>)}
+      <rect x="155" y="72" width="20" height="20" fill="none" stroke={c} strokeWidth="2" />
+      <path d="M120 45 A20 20 0 0 1 100 65" fill="none" stroke={c+"44"} strokeWidth="1"/>
+      {[50,90,220,270,320,370,420].map((x,i)=><rect key={i} x={x} y="2" width="30" height="6" fill={CI.softSky} stroke={CI.icyBreeze} strokeWidth=".5" rx="1"/>)}
+      {[50,120,190,260,330,400,460].map((x,i)=><rect key={`b${i}`} x={x} y="242" width="30" height="6" fill={CI.softSky} stroke={CI.icyBreeze} strokeWidth=".5" rx="1"/>)}
+      {[40,100,160].map((y,i)=><rect key={`l${i}`} x="2" y={y} width="6" height="25" fill={CI.softSky} stroke={CI.icyBreeze} strokeWidth=".5" rx="1"/>)}
+      {[40,100,160].map((y,i)=><rect key={`r${i}`} x="492" y={y} width="6" height="25" fill={CI.softSky} stroke={CI.icyBreeze} strokeWidth=".5" rx="1"/>)}
+      {[160,250,340,430].flatMap(x=>[80,150,220].map(y=><rect key={`${x}${y}`} x={x-4} y={y-4} width="8" height="8" fill={c} opacity=".5"/>))}
+      <circle cx="300" cy="130" r="4" fill={CI.brightHorizon} opacity={.5+.5*Math.sin(tick*.3)}><animate attributeName="r" values="3;5;3" dur="2s" repeatCount="indefinite"/></circle>
+      <text x="300" y="200" textAnchor="middle" fill={c} opacity=".35" fontSize="12" style={{ fontFamily: "'Geist Variable', sans-serif", fontWeight: 600 }}>GEB. 42 · FOYER / AUSSTELLUNG</text>
     </svg>
   );
 }
@@ -151,28 +186,24 @@ function EGPlan({ tick }) {
 function OGPlan({ tick, wallStates, wallTypes, onWallClick, floor, selectedWallId, extWalls, selectedExtSide, onExtSideClick }) {
   const c = floor.color;
   return (
-    <svg viewBox="0 0 500 250" style={{ width: "100%", background: "#080e1a" }}>
-      {/* 4 individually clickable exterior wall sides */}
+    <svg viewBox="0 0 500 250" style={{ width: "100%", background: "var(--rzz-surface-inset)" }}>
       {EXT_SIDES.map(s => {
         const ew = extWalls[s.id];
         const wt = wallTypes.find(t => t.id === ew.typeId) || wallTypes.find(t => t.isExterior);
         const col = wt ? wt.color : c;
         const isSel = selectedExtSide === s.id;
         const bd = ew.bufferDepth;
-        // buffer zone rect
         const bufRect = bd > 0 ? (s.axis === "h"
           ? { x: 9, y: s.inward > 0 ? 9 : 241 - bd, w: 482, h: bd }
           : { x: s.inward > 0 ? 9 : 491 - bd, y: 9, w: bd, h: 232 }) : null;
-        // inner buffer wall line
         const bufLine = bd > 0 ? (s.axis === "h"
           ? { x1: 9, y1: s.inward > 0 ? 9 + bd : 241 - bd, x2: 491, y2: s.inward > 0 ? 9 + bd : 241 - bd }
           : { x1: s.inward > 0 ? 9 + bd : 491 - bd, y1: 9, x2: s.inward > 0 ? 9 + bd : 491 - bd, y2: 241 }) : null;
         return (
           <g key={s.id} onClick={() => onExtSideClick(s.id)} style={{ cursor: "pointer" }}>
-            {bufRect && <rect x={bufRect.x} y={bufRect.y} width={bufRect.w} height={bufRect.h} fill={col} opacity=".08" />}
+            {bufRect && <rect x={bufRect.x} y={bufRect.y} width={bufRect.w} height={bufRect.h} fill={col} opacity=".10" />}
             {bufLine && <line x1={bufLine.x1} y1={bufLine.y1} x2={bufLine.x2} y2={bufLine.y2} stroke={col} strokeWidth="2" strokeDasharray="6 3" opacity=".7" />}
-            <line x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} stroke={col} strokeWidth={isSel ? 12 : 8} />
-            {isSel && <line x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} stroke="#fff" strokeWidth="12" opacity=".15" />}
+            <line x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} stroke={isSel ? CI.pulseRed : col} strokeWidth={isSel ? 12 : 8} />
             <line x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} stroke="transparent" strokeWidth="18" />
           </g>
         );
@@ -182,28 +213,27 @@ function OGPlan({ tick, wallStates, wallTypes, onWallClick, floor, selectedWallI
       <rect x="155" y="85" width="20" height="20" fill="none" stroke={c} strokeWidth="2" />
       <path d="M120 60 A15 15 0 0 1 105 75" fill="none" stroke={c+"44"} strokeWidth="1"/>
       <path d="M120 90 A15 15 0 0 0 105 75" fill="none" stroke={c+"44"} strokeWidth="1"/>
-      {[15,45,75,215,255,295,335,375,415,455].map((x,i)=><rect key={i} x={x} y="2" width="22" height="6" fill="#22d3ee18" stroke="#22d3ee33" strokeWidth=".5" rx="1"/>)}
-      {[15,55,95,135,175,215,255,295,335,375,415,455].map((x,i)=><rect key={`b${i}`} x={x} y="242" width="22" height="6" fill="#22d3ee18" stroke="#22d3ee33" strokeWidth=".5" rx="1"/>)}
-      {[15,60,140,185].map((y,i)=><rect key={`l${i}`} x="2" y={y} width="6" height="20" fill="#22d3ee18" stroke="#22d3ee33" strokeWidth=".5" rx="1"/>)}
-      {[15,60,140,185].map((y,i)=><rect key={`r${i}`} x="492" y={y} width="6" height="20" fill="#22d3ee18" stroke="#22d3ee33" strokeWidth=".5" rx="1"/>)}
+      {[15,45,75,215,255,295,335,375,415,455].map((x,i)=><rect key={i} x={x} y="2" width="22" height="6" fill={CI.softSky} stroke={CI.icyBreeze} strokeWidth=".5" rx="1"/>)}
+      {[15,55,95,135,175,215,255,295,335,375,415,455].map((x,i)=><rect key={`b${i}`} x={x} y="242" width="22" height="6" fill={CI.softSky} stroke={CI.icyBreeze} strokeWidth=".5" rx="1"/>)}
+      {[15,60,140,185].map((y,i)=><rect key={`l${i}`} x="2" y={y} width="6" height="20" fill={CI.softSky} stroke={CI.icyBreeze} strokeWidth=".5" rx="1"/>)}
+      {[15,60,140,185].map((y,i)=><rect key={`r${i}`} x="492" y={y} width="6" height="20" fill={CI.softSky} stroke={CI.icyBreeze} strokeWidth=".5" rx="1"/>)}
       {OG_WALLS_INIT.map(w => {
         const ws = wallStates[w.id]; if (!ws) return null;
-        // apply buffer offsets to wall endpoints
         let x1 = w.x1+5, y1 = w.y1, x2 = w.x2+5, y2 = w.y2;
         const bn = extWalls.nord.bufferDepth, bs = extWalls.sued.bufferDepth, bw = extWalls.west.bufferDepth, bo = extWalls.ost.bufferDepth;
         if (bn > 0) { if (y1 <= 10) y1 = 9 + bn; if (y2 <= 10) y2 = 9 + bn; }
         if (bs > 0) { if (y1 >= 230) y1 = 241 - bs; if (y2 >= 230) y2 = 241 - bs; }
         if (bw > 0) { if (x1 <= 9) x1 = 9 + bw; if (x2 <= 9) x2 = 9 + bw; }
         if (bo > 0) { if (x1 >= 490) x1 = 491 - bo; if (x2 >= 490) x2 = 491 - bo; }
-        if (Math.abs(x2 - x1) < 2 && Math.abs(y2 - y1) < 2) return null; // wall fully consumed by buffer
+        if (Math.abs(x2 - x1) < 2 && Math.abs(y2 - y1) < 2) return null;
         const on = ws.active, wt = wallTypes.find(t => t.id === ws.typeId), col = wt ? wt.color : c, isSel = selectedWallId === w.id;
+        const strokeCol = isSel ? CI.pulseRed : (on ? col : col+"33");
         return (<g key={w.id} onClick={() => onWallClick(w.id)} style={{ cursor: "pointer" }}>
-          <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={on ? col : col+"18"} strokeWidth={on?(isSel?5:3):1} strokeDasharray={on?"none":"5 4"}/>
-          {isSel && on && <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#fff" strokeWidth="7" opacity=".15"/>}
+          <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={strokeCol} strokeWidth={on?(isSel?5:3):1} strokeDasharray={on?"none":"5 4"}/>
           <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="transparent" strokeWidth="14"/>
         </g>);
       })}
-      <circle cx="300" cy="70" r="3" fill="#22c55e" opacity={.5+.5*Math.sin(tick*.3)}><animate attributeName="r" values="2;4;2" dur="2s" repeatCount="indefinite"/></circle>
+      <circle cx="300" cy="70" r="3" fill={CI.brightHorizon} opacity={.5+.5*Math.sin(tick*.3)}><animate attributeName="r" values="2;4;2" dur="2s" repeatCount="indefinite"/></circle>
     </svg>
   );
 }
@@ -211,107 +241,115 @@ function OGPlan({ tick, wallStates, wallTypes, onWallClick, floor, selectedWallI
 function RoofPlan({ pvDachOn, onTogglePvDach, pvFreiraumOn, onTogglePvFreiraum, tick }) {
   const sh = .3 + .7 * Math.max(0, Math.sin(((tick * .5) % 24 - 6) / 12 * Math.PI));
   return (
-    <svg viewBox="0 0 500 340" style={{ width: "100%", background: "#080e1a" }}>
-      {/* Dach PV */}
-      <text x="250" y="16" textAnchor="middle" fill="#22d3ee88" fontSize="9" fontWeight="600">GEB. 42 · DACH</text>
-      <rect x="5" y="22" width="490" height="130" fill="none" stroke="#22d3ee" strokeWidth="3" strokeDasharray={pvDachOn ? "none" : "6 4"} rx="4" />
-      <rect x="440" y="26" width="50" height="18" rx="3" fill={pvDachOn ? "#0e7490" : "#1e293b"} stroke={pvDachOn ? "#22d3ee" : "#334155"} strokeWidth="1" cursor="pointer" onClick={onTogglePvDach} />
-      <text x="465" y="38" textAnchor="middle" fill={pvDachOn ? "#22d3ee" : "#475569"} fontSize="7" fontWeight="700" style={{ cursor: "pointer", pointerEvents: "none" }}>{pvDachOn ? "AN" : "AUS"}</text>
+    <svg viewBox="0 0 500 340" style={{ width: "100%", background: "var(--rzz-surface-inset)" }}>
+      {/* Dach PV — Core Blue → Icy Breeze, blue-on-blue per Verlauf */}
+      <defs>
+        <linearGradient id="pvDachGrad" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stopColor={CI.coreBlue} />
+          <stop offset="100%" stopColor={CI.icyBreeze} />
+        </linearGradient>
+        <linearGradient id="pvFreiGrad" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stopColor={CI.brightHorizon} />
+          <stop offset="100%" stopColor={CI.softSky} />
+        </linearGradient>
+      </defs>
+      <text x="250" y="16" textAnchor="middle" fill={CI.coreBlue} fontSize="10" fontWeight="700" style={{ fontFamily: "'Geist Variable', sans-serif", letterSpacing: 1 }}>GEB. 42 · DACH</text>
+      <rect x="5" y="22" width="490" height="130" fill="none" stroke={CI.coreBlue} strokeWidth="3" strokeDasharray={pvDachOn ? "none" : "6 4"} rx="4" />
+      <rect x="440" y="26" width="50" height="18" rx="3" fill={pvDachOn ? CI.coreBlue : "transparent"} stroke={pvDachOn ? CI.coreBlue : CI.urbanAsh} strokeWidth="1" cursor="pointer" onClick={onTogglePvDach} />
+      <text x="465" y="38" textAnchor="middle" fill={pvDachOn ? "#FFFFFF" : CI.urbanAsh} fontSize="8" fontWeight="700" style={{ cursor: "pointer", pointerEvents: "none", fontFamily: "'Geist Variable', sans-serif" }}>{pvDachOn ? "AN" : "AUS"}</text>
       {pvDachOn && Array.from({ length: 3 }, (_, r) => Array.from({ length: 12 }, (_, cc) => {
         const x = 15 + cc * 39, y = 28 + r * 38;
-        return <rect key={`d${r}${cc}`} x={x} y={y} width="36" height="35" rx="1" fill="#0e7490" opacity={sh * .45} stroke="#22d3ee44" strokeWidth=".5" />;
+        return <rect key={`d${r}${cc}`} x={x} y={y} width="36" height="35" rx="1" fill="url(#pvDachGrad)" opacity={sh * .85} stroke={CI.coreBlue} strokeWidth=".5" />;
       })).flat()}
-      {!pvDachOn && <text x="230" y="90" textAnchor="middle" fill="#334155" fontSize="10">PV Dach deaktiviert</text>}
+      {!pvDachOn && <text x="230" y="90" textAnchor="middle" fill={CI.urbanAsh} fontSize="11" style={{ fontFamily: "'Geist Variable', sans-serif" }}>PV Dach deaktiviert</text>}
 
       {/* Freiraum PV */}
-      <text x="250" y="175" textAnchor="middle" fill="#34d39988" fontSize="9" fontWeight="600">FREIRAUM · PV-FELD</text>
-      <rect x="5" y="182" width="490" height="150" fill="none" stroke="#34d399" strokeWidth="3" strokeDasharray={pvFreiraumOn ? "none" : "6 4"} rx="4" />
-      <rect x="440" y="186" width="50" height="18" rx="3" fill={pvFreiraumOn ? "#065f46" : "#1e293b"} stroke={pvFreiraumOn ? "#34d399" : "#334155"} strokeWidth="1" cursor="pointer" onClick={onTogglePvFreiraum} />
-      <text x="465" y="198" textAnchor="middle" fill={pvFreiraumOn ? "#34d399" : "#475569"} fontSize="7" fontWeight="700" style={{ pointerEvents: "none" }}>{pvFreiraumOn ? "AN" : "AUS"}</text>
+      <text x="250" y="175" textAnchor="middle" fill={CI.brightHorizon} fontSize="10" fontWeight="700" style={{ fontFamily: "'Geist Variable', sans-serif", letterSpacing: 1 }}>FREIRAUM · PV-FELD</text>
+      <rect x="5" y="182" width="490" height="150" fill="none" stroke={CI.brightHorizon} strokeWidth="3" strokeDasharray={pvFreiraumOn ? "none" : "6 4"} rx="4" />
+      <rect x="440" y="186" width="50" height="18" rx="3" fill={pvFreiraumOn ? CI.brightHorizon : "transparent"} stroke={pvFreiraumOn ? CI.brightHorizon : CI.urbanAsh} strokeWidth="1" cursor="pointer" onClick={onTogglePvFreiraum} />
+      <text x="465" y="198" textAnchor="middle" fill={pvFreiraumOn ? "#FFFFFF" : CI.urbanAsh} fontSize="8" fontWeight="700" style={{ pointerEvents: "none", fontFamily: "'Geist Variable', sans-serif" }}>{pvFreiraumOn ? "AN" : "AUS"}</text>
       {pvFreiraumOn && Array.from({ length: 4 }, (_, r) => Array.from({ length: 12 }, (_, cc) => {
         const x = 15 + cc * 39, y = 190 + r * 34;
-        return <rect key={`f${r}${cc}`} x={x} y={y} width="36" height="31" rx="1" fill="#065f46" opacity={sh * .4} stroke="#34d39944" strokeWidth=".5" />;
+        return <rect key={`f${r}${cc}`} x={x} y={y} width="36" height="31" rx="1" fill="url(#pvFreiGrad)" opacity={sh * .85} stroke={CI.brightHorizon} strokeWidth=".5" />;
       })).flat()}
-      {!pvFreiraumOn && <text x="230" y="260" textAnchor="middle" fill="#334155" fontSize="10">PV Freiraum deaktiviert</text>}
+      {!pvFreiraumOn && <text x="230" y="260" textAnchor="middle" fill={CI.urbanAsh} fontSize="11" style={{ fontFamily: "'Geist Variable', sans-serif" }}>PV Freiraum deaktiviert</text>}
     </svg>
   );
 }
 
 function WallSectionVis({ wt }) {
   const total = wt.layers.reduce((s, l) => s + l.thickness, 0);
-  const cols = ["#9ca3af","#fde68a","#dc8850","#e5e7eb","#a8845a","#86a873","#b0a898","#c4b5fd"];
+  // Material-honest neutrals (plaster / insulation / brick / clay) — desaturated so the brand colors stay distinct.
+  const cols = ["#E3E3E3","#D4E8F7","#A2D3F3","#FFFFFF","#878787","#3973B9","#B4B4B4","#164194"];
   return (
-    <div style={{ display: "flex", height: 72, borderRadius: 4, overflow: "hidden", border: "1px solid #334155" }}>
+    <div style={{ display: "flex", height: 72, borderRadius: 4, overflow: "hidden", border: "1px solid var(--rzz-border)" }}>
       {wt.layers.map((l, i) => (
-        <div key={i} style={{ width: `${(l.thickness / total) * 100}%`, background: cols[i % cols.length], display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontSize: 6, color: "#0f172a", fontWeight: 700, borderRight: i < wt.layers.length - 1 ? "1px solid #0f172a" : "none", minWidth: 6 }}>
-          <span style={{ writingMode: "vertical-rl", transform: "rotate(180deg)", fontSize: 6, maxHeight: 55, overflow: "hidden" }}>{l.name}</span>
-          <span>{l.thickness}</span>
+        <div key={i} style={{ width: `${(l.thickness / total) * 100}%`, background: cols[i % cols.length], display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontSize: 7, color: CI.deepVoid, fontWeight: 700, borderRight: i < wt.layers.length - 1 ? `1px solid ${CI.urbanAsh}33` : "none", minWidth: 6 }}>
+          <span style={{ writingMode: "vertical-rl", transform: "rotate(180deg)", fontSize: 7, maxHeight: 55, overflow: "hidden" }}>{l.name}</span>
+          <span className="rzz-mono">{l.thickness}</span>
         </div>
       ))}
     </div>
   );
 }
 
-/* ═══ ENERGY FLOW (two buildings, two PV, two storages) ═══ */
+/* ═══ ENERGY FLOW ═══ */
 function EnergyFlow({ d, p, tick, pvDachOn, pvFreiraumOn }) {
   const pu = Math.sin(tick * .3) * .5 + .5;
   return (
     <svg viewBox="0 0 520 220" style={{ width: "100%" }}>
       {/* PV Dach */}
-      <rect x="80" y="2" width="90" height="28" rx="4" fill={pvDachOn ? "#0e7490" : "#1e293b"} opacity={pvDachOn ? .7+pu*.3 : .5} />
-      <text x="125" y="13" textAnchor="middle" fill={pvDachOn?"#22d3ee":"#475569"} fontSize="7" fontWeight="700">☀️ PV Dach</text>
-      <text x="125" y="25" textAnchor="middle" fill={pvDachOn?"#67e8f9":"#334155"} fontSize="9" fontWeight="800">{d.pvDach} kW</text>
+      <rect x="80" y="2" width="90" height="28" rx="4" fill={pvDachOn ? CI.coreBlue : "transparent"} stroke={pvDachOn ? CI.coreBlue : CI.urbanAsh} strokeWidth="1" opacity={pvDachOn ? .85+pu*.15 : .5} />
+      <text x="125" y="13" textAnchor="middle" fill={pvDachOn ? "#FFFFFF" : CI.urbanAsh} fontSize="8" fontWeight="700" style={{ fontFamily: "'Geist Variable', sans-serif" }}>PV Dach</text>
+      <text x="125" y="25" textAnchor="middle" fill={pvDachOn ? "#FFFFFF" : CI.urbanAsh} fontSize="10" fontWeight="800" className="rzz-mono">{d.pvDach} kW</text>
       {/* PV Freiraum */}
-      <rect x="190" y="2" width="90" height="28" rx="4" fill={pvFreiraumOn ? "#065f46" : "#1e293b"} opacity={pvFreiraumOn ? .7+pu*.3 : .5} />
-      <text x="235" y="13" textAnchor="middle" fill={pvFreiraumOn?"#34d399":"#475569"} fontSize="7" fontWeight="700">☀️ PV Freiraum</text>
-      <text x="235" y="25" textAnchor="middle" fill={pvFreiraumOn?"#6ee7b7":"#334155"} fontSize="9" fontWeight="800">{d.pvFrei} kW</text>
+      <rect x="190" y="2" width="90" height="28" rx="4" fill={pvFreiraumOn ? CI.brightHorizon : "transparent"} stroke={pvFreiraumOn ? CI.brightHorizon : CI.urbanAsh} strokeWidth="1" opacity={pvFreiraumOn ? .85+pu*.15 : .5} />
+      <text x="235" y="13" textAnchor="middle" fill={pvFreiraumOn ? "#FFFFFF" : CI.urbanAsh} fontSize="8" fontWeight="700" style={{ fontFamily: "'Geist Variable', sans-serif" }}>PV Freiraum</text>
+      <text x="235" y="25" textAnchor="middle" fill={pvFreiraumOn ? "#FFFFFF" : CI.urbanAsh} fontSize="10" fontWeight="800" className="rzz-mono">{d.pvFrei} kW</text>
 
       {/* Flows from PV down */}
-      {d.pvDach > .3 && <line x1="125" y1="31" x2="175" y2="60" stroke="#22d3ee" strokeWidth={1+d.pvDach/8} strokeDasharray="4 3" opacity={.4+pu*.5}><animate attributeName="stroke-dashoffset" from="14" to="0" dur=".7s" repeatCount="indefinite"/></line>}
-      {d.pvFrei > .3 && <line x1="235" y1="31" x2="195" y2="60" stroke="#34d399" strokeWidth={1+d.pvFrei/8} strokeDasharray="4 3" opacity={.4+pu*.5}><animate attributeName="stroke-dashoffset" from="14" to="0" dur=".8s" repeatCount="indefinite"/></line>}
+      {d.pvDach > .3 && <line x1="125" y1="31" x2="175" y2="60" stroke={CI.coreBlue} strokeWidth={1+d.pvDach/8} strokeDasharray="4 3" opacity={.5+pu*.4}><animate attributeName="stroke-dashoffset" from="14" to="0" dur=".7s" repeatCount="indefinite"/></line>}
+      {d.pvFrei > .3 && <line x1="235" y1="31" x2="195" y2="60" stroke={CI.brightHorizon} strokeWidth={1+d.pvFrei/8} strokeDasharray="4 3" opacity={.5+pu*.4}><animate attributeName="stroke-dashoffset" from="14" to="0" dur=".8s" repeatCount="indefinite"/></line>}
 
       {/* Geb 42 */}
-      <rect x="135" y="58" width="100" height="36" rx="5" fill="#064e3b" />
-      <text x="185" y="72" textAnchor="middle" fill="#34d399" fontSize="7" fontWeight="700">🏢 Geb. 42</text>
-      <text x="185" y="86" textAnchor="middle" fill="#6ee7b7" fontSize="10" fontWeight="800">{d.con42} kW</text>
+      <rect x="135" y="58" width="100" height="36" rx="5" fill={CI.icyBreeze} stroke={CI.brightHorizon} strokeWidth="1" />
+      <text x="185" y="72" textAnchor="middle" fill={CI.deepVoid} fontSize="8" fontWeight="700" style={{ fontFamily: "'Geist Variable', sans-serif" }}>Geb. 42</text>
+      <text x="185" y="86" textAnchor="middle" fill={CI.coreBlue} fontSize="11" fontWeight="800" className="rzz-mono">{d.con42} kW</text>
 
       {/* Geb 52/53 */}
-      <rect x="340" y="58" width="110" height="36" rx="5" fill="#1c1917" />
-      <text x="395" y="72" textAnchor="middle" fill="#fb923c" fontSize="7" fontWeight="700">🏭 Geb. 52/53</text>
-      <text x="395" y="86" textAnchor="middle" fill="#fdba74" fontSize="10" fontWeight="800">{d.con52} kW</text>
+      <rect x="340" y="58" width="110" height="36" rx="5" fill={CI.softSky} stroke={CI.brightHorizon} strokeWidth="1" />
+      <text x="395" y="72" textAnchor="middle" fill={CI.deepVoid} fontSize="8" fontWeight="700" style={{ fontFamily: "'Geist Variable', sans-serif" }}>Geb. 52/53</text>
+      <text x="395" y="86" textAnchor="middle" fill={CI.coreBlue} fontSize="11" fontWeight="800" className="rzz-mono">{d.con52} kW</text>
 
       {/* Flow Geb42 → Geb52 */}
-      <line x1="237" y1="76" x2="338" y2="76" stroke="#f59e0b" strokeWidth="1.5" strokeDasharray="4 3" opacity={.3+pu*.4}><animate attributeName="stroke-dashoffset" from="14" to="0" dur=".9s" repeatCount="indefinite"/></line>
-      <text x="288" y="72" textAnchor="middle" fill="#f59e0b55" fontSize="6">Versorgung →</text>
+      <line x1="237" y1="76" x2="338" y2="76" stroke={CI.urbanAsh} strokeWidth="1.5" strokeDasharray="4 3" opacity={.4+pu*.4}><animate attributeName="stroke-dashoffset" from="14" to="0" dur=".9s" repeatCount="indefinite"/></line>
+      <text x="288" y="72" textAnchor="middle" fill={CI.urbanAsh} fontSize="7" style={{ fontFamily: "'Geist Variable', sans-serif" }}>Versorgung →</text>
 
       {/* El. Speicher */}
-      <rect x="8" y="115" width="100" height="44" rx="5" fill="#1e1b4b" />
-      <text x="58" y="130" textAnchor="middle" fill="#a78bfa" fontSize="7" fontWeight="700">🔋 El. Speicher</text>
-      <text x="58" y="146" textAnchor="middle" fill="#c4b5fd" fontSize="9" fontWeight="800">{d.elStored} / {p.batteryEl} kWh</text>
-      <rect x="12" y="153" width="92" height="3" rx="1.5" fill="#1e293b"/><rect x="12" y="153" width={Math.max(0,d.elSOC*.92)} height="3" rx="1.5" fill={d.elSOC>20?"#a78bfa":"#ef4444"}/>
+      <rect x="8" y="115" width="100" height="44" rx="5" fill="var(--rzz-surface-2)" stroke={CI.brightHorizon} strokeWidth="1" />
+      <text x="58" y="130" textAnchor="middle" fill={CI.brightHorizon} fontSize="8" fontWeight="700" style={{ fontFamily: "'Geist Variable', sans-serif" }}>El. Speicher</text>
+      <text x="58" y="146" textAnchor="middle" fill="var(--rzz-text)" fontSize="10" fontWeight="800" className="rzz-mono">{d.elStored} / {p.batteryEl} kWh</text>
+      <rect x="12" y="153" width="92" height="3" rx="1.5" fill={CI.urbanAsh} opacity=".3"/>
+      <rect x="12" y="153" width={Math.max(0,d.elSOC*.92)} height="3" rx="1.5" fill={d.elSOC>20 ? CI.coreBlue : CI.pulseRed}/>
 
       {/* Th. Speicher */}
-      <rect x="130" y="115" width="110" height="44" rx="5" fill="#7c2d12" />
-      <text x="185" y="130" textAnchor="middle" fill="#fb923c" fontSize="7" fontWeight="700">♨️ Therm. Speicher</text>
-      <text x="185" y="146" textAnchor="middle" fill="#fdba74" fontSize="9" fontWeight="800">{d.thStored} / {p.batteryTh} kWh</text>
-      <rect x="134" y="153" width="102" height="3" rx="1.5" fill="#1e293b"/><rect x="134" y="153" width={Math.max(0,d.thSOC*1.02)} height="3" rx="1.5" fill={d.thSOC>20?"#fb923c":"#ef4444"}/>
+      <rect x="130" y="115" width="110" height="44" rx="5" fill="var(--rzz-surface-2)" stroke={CI.brightHorizon} strokeWidth="1" />
+      <text x="185" y="130" textAnchor="middle" fill={CI.brightHorizon} fontSize="8" fontWeight="700" style={{ fontFamily: "'Geist Variable', sans-serif" }}>Therm. Speicher</text>
+      <text x="185" y="146" textAnchor="middle" fill="var(--rzz-text)" fontSize="10" fontWeight="800" className="rzz-mono">{d.thStored} / {p.batteryTh} kWh</text>
+      <rect x="134" y="153" width="102" height="3" rx="1.5" fill={CI.urbanAsh} opacity=".3"/>
+      <rect x="134" y="153" width={Math.max(0,d.thSOC*1.02)} height="3" rx="1.5" fill={d.thSOC>20 ? CI.coreBlue : CI.pulseRed}/>
 
       {/* Netz */}
-      <rect x="350" y="115" width="100" height="44" rx="5" fill="#4c1d1d" />
-      <text x="400" y="130" textAnchor="middle" fill="#f87171" fontSize="7" fontWeight="700">⚡ Netz</text>
-      <text x="400" y="146" textAnchor="middle" fill="#fca5a5" fontSize="10" fontWeight="800">{d.grid} kW</text>
+      <rect x="350" y="115" width="100" height="44" rx="5" fill="var(--rzz-surface-2)" stroke={d.grid > 1 ? CI.pulseRed : CI.urbanAsh} strokeWidth="1" />
+      <text x="400" y="130" textAnchor="middle" fill={d.grid > 1 ? CI.pulseRed : CI.urbanAsh} fontSize="8" fontWeight="700" style={{ fontFamily: "'Geist Variable', sans-serif" }}>Netzbezug</text>
+      <text x="400" y="146" textAnchor="middle" fill={d.grid > 1 ? CI.pulseRed : "var(--rzz-text)"} fontSize="11" fontWeight="800" className="rzz-mono">{d.grid} kW</text>
 
-      {/* Flow lines to storages */}
-      {d.elSOC > 10 && <line x1="110" y1="135" x2="133" y2="76" stroke="#a78bfa" strokeWidth="1.2" strokeDasharray="3 3" opacity={.3+pu*.3}><animate attributeName="stroke-dashoffset" from="10" to="0" dur="1s" repeatCount="indefinite"/></line>}
-      {d.grid > .5 && <line x1="348" y1="135" x2="345" y2="96" stroke="#f87171" strokeWidth={1+d.grid/6} strokeDasharray="4 3" opacity={.3+pu*.5}><animate attributeName="stroke-dashoffset" from="0" to="14" dur=".5s" repeatCount="indefinite"/></line>}
+      {d.elSOC > 10 && <line x1="110" y1="135" x2="133" y2="76" stroke={CI.brightHorizon} strokeWidth="1.2" strokeDasharray="3 3" opacity={.4+pu*.3}><animate attributeName="stroke-dashoffset" from="10" to="0" dur="1s" repeatCount="indefinite"/></line>}
+      {d.grid > .5 && <line x1="348" y1="135" x2="345" y2="96" stroke={CI.pulseRed} strokeWidth={1+d.grid/6} strokeDasharray="4 3" opacity={.5+pu*.4}><animate attributeName="stroke-dashoffset" from="0" to="14" dur=".5s" repeatCount="indefinite"/></line>}
 
       {/* Autarkie */}
-      <text x="280" y="180" textAnchor="middle" fill="#475569" fontSize="7">Autarkiegrad Gesamt</text>
-      <text x="280" y="200" textAnchor="middle" fill="#22d3ee" fontSize="18" fontWeight="800">{d.conTotal > 0 ? Math.min(100, ((1 - d.grid / d.conTotal) * 100)).toFixed(0) : 0}%</text>
-
-      {/* Labels */}
-      <text x="58" y="175" textAnchor="middle" fill="#a78bfa55" fontSize="6">Geb. 42 · UG</text>
-      <text x="185" y="175" textAnchor="middle" fill="#fb923c55" fontSize="6">Geb. 42 · UG</text>
+      <text x="280" y="180" textAnchor="middle" fill={CI.urbanAsh} fontSize="8" fontWeight="600" style={{ fontFamily: "'Geist Variable', sans-serif", letterSpacing: 1 }}>AUTARKIEGRAD GESAMT</text>
+      <text x="280" y="202" textAnchor="middle" fill={CI.coreBlue} fontSize="22" fontWeight="800" className="rzz-mono">{d.conTotal > 0 ? Math.min(100, ((1 - d.grid / d.conTotal) * 100)).toFixed(0) : 0}%</text>
     </svg>
   );
 }
@@ -333,8 +371,14 @@ export default function App() {
   const [showNewType, setShowNewType] = useState(false);
   const [newTypeName, setNewTypeName] = useState("");
   const [newTypeLayers, setNewTypeLayers] = useState([{ name: "Schicht 1", thickness: 15, density: 1600, gwp: 0.02, voc: 0, lambda: 0.91 }]);
-  const [newTypeColor, setNewTypeColor] = useState("#34d399");
+  const [newTypeColor, setNewTypeColor] = useState(CI.brightHorizon);
   const [newTypeIsExterior, setNewTypeIsExterior] = useState(false);
+  const [theme, setTheme] = useState(() => (typeof document !== "undefined" && document.documentElement.getAttribute("data-theme")) || "light");
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    try { localStorage.setItem("rzz-theme", theme); } catch { /* noop */ }
+  }, [theme]);
 
   useEffect(() => { const iv = setInterval(() => setTick(t => t + 1), 1500); return () => clearInterval(iv); }, []);
   useEffect(() => { setHist(h => [...h.slice(-30), { ...genEnergy(tick, params, pvDachOn, pvFreiraumOn), t: tick }]); }, [tick, params, pvDachOn, pvFreiraumOn]);
@@ -357,10 +401,10 @@ export default function App() {
           setSel(cmd.floor);
           ws.send(JSON.stringify({ type: 'ack', action: 'set_floor', ok: true }));
         }
-      } catch {}
+      } catch { /* ignore */ }
     };
     ws.onerror = () => {};
-    return () => { try { ws.close(); } catch {} };
+    return () => { try { ws.close(); } catch { /* noop */ } };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const cur = hist[hist.length - 1] || { pvDach:0,pvFrei:0,pvTotal:0,con42:0,con52:0,conTotal:0,elStored:0,elSOC:0,thStored:0,thSOC:0,grid:0,label:"–" };
@@ -380,18 +424,18 @@ export default function App() {
   };
   const updateNewLayer = (idx, key, val) => setNewTypeLayers(ls => ls.map((l, i) => i === idx ? { ...l, [key]: typeof l[key] === "number" ? parseFloat(val) || 0 : val } : l));
 
-  // per-side areas (m²): Nord/Süd = 25m × 5 floors × 3.2m, Ost/West = 12m × 5 × 3.2m
   const SIDE_AREAS = { nord: 25*3.2*5, sued: 25*3.2*5, ost: 12*3.2*5, west: 12*3.2*5 };
   const selSideData = selectedExtSide ? extWalls[selectedExtSide] : null;
   const selSideWT = selSideData ? (wallTypes.find(t => t.id === selSideData.typeId) || wallTypes.find(t => t.isExterior)) : null;
   const selSideCalc = selSideWT ? calcWallType(selSideWT) : null;
   let extGWP = 0;
   EXT_SIDES.forEach(s => { const wt = wallTypes.find(t => t.id === extWalls[s.id].typeId) || wallTypes.find(t => t.isExterior); if (wt) extGWP += calcWallType(wt).totalGWP * SIDE_AREAS[s.id]; });
-  // keep extCalc for Auswertung U-value (use nord as reference)
   const nordWT = wallTypes.find(t => t.id === extWalls.nord.typeId) || wallTypes.find(t => t.isExterior);
   const extCalc = nordWT ? calcWallType(nordWT) : { uValue: 0, totalGWP: 0 };
+  const extArea = Object.values(SIDE_AREAS).reduce((a, b) => a + b, 0);
+  const extWT = nordWT || { name: "–", color: CI.coreBlue };
   let intGWP = 0;
-  Object.entries(wallStates).forEach(([_, ws]) => { if (!ws.active) return; const wt = wallTypes.find(t => t.id === ws.typeId); if (wt) intGWP += calcWallType(wt).totalGWP * 3.5 * 3.2 * 4; });
+  Object.entries(wallStates).forEach(([, ws]) => { if (!ws.active) return; const wt = wallTypes.find(t => t.id === ws.typeId); if (wt) intGWP += calcWallType(wt).totalGWP * 3.5 * 3.2 * 4; });
   const totalGWP = extGWP + intGWP;
 
   const sensors = {
@@ -401,96 +445,116 @@ export default function App() {
     voc: Math.max(30, (150 + ns(tick * 0.1 + 30, 0.08, 30) - params.ventilation * 0.15)).toFixed(0),
   };
 
+  const okColor = "var(--rzz-primary)"; // brand-blue replaces traffic-light green (CI: no Extra Grün in UI)
+  const warnColor = CI.pulseRed;
+
   return (
-    <div style={{ background: "#020617", color: "#e2e8f0", minHeight: "100vh", fontFamily: "'JetBrains Mono','Fira Code',monospace", fontSize: 11 }}>
-      <div style={{ background: "#0f172a", borderBottom: "1px solid #1e293b", padding: "8px 12px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 6, position: "sticky", top: 0, zIndex: 10 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 6px #22c55e" }} />
-          <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: 2, color: "#22d3ee" }}>REALLABOR</span>
-          <span style={{ fontSize: 11, color: "#475569" }}>DIGITALER ZWILLING · GEB. 42 + 52/53</span>
+    <div style={{ background: "var(--rzz-bg)", color: "var(--rzz-text)", minHeight: "100vh", fontFamily: "'Geist Variable', system-ui, sans-serif", fontSize: 12 }}>
+      <div style={{ background: "var(--rzz-surface-2)", borderBottom: "1px solid var(--rzz-border)", padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, position: "sticky", top: 0, zIndex: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <Signet size={32} color="var(--rzz-primary)" />
+          <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.05, fontWeight: 800, letterSpacing: 0.5, fontSize: 13, color: "var(--rzz-text)" }}>
+            <span>REALLABOR</span>
+            <span style={{ paddingLeft: "1.6em" }}>ZEKIWA</span>
+            <span style={{ paddingLeft: "3.2em" }}>ZEITZ</span>
+          </div>
+          <span style={{ width: 1, height: 28, background: "var(--rzz-border-strong)", margin: "0 6px" }} />
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: 1.5, color: "var(--rzz-text)", textTransform: "uppercase" }}>Digitaler Zwilling</span>
+            <span style={{ fontSize: 10, color: "var(--rzz-text-dim)" }}>Geb. 42 + 52/53</span>
+          </div>
         </div>
-        <div style={{ display: "flex", gap: 2 }}>
-          {["live","codesign","material"].map(v => (
-            <button key={v} onClick={() => setView(v)} style={{ padding: "4px 12px", borderRadius: 4, border: "1px solid", fontSize: 9, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", textTransform: "uppercase", letterSpacing: 1, background: view === v ? "#22d3ee" : "transparent", color: view === v ? "#020617" : "#475569", borderColor: view === v ? "#22d3ee" : "#1e293b" }}>{v === "codesign" ? "Co-Design" : v}</button>
-          ))}
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10, color: "var(--rzz-text-dim)", letterSpacing: 1, textTransform: "uppercase" }}>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: cur.grid > 1 ? CI.pulseRed : CI.coreBlue }} />
+            <span>{cur.grid > 1 ? "Netzbezug" : "Live"}</span>
+          </div>
+          <div style={{ display: "flex", gap: 0, borderBottom: "1px solid var(--rzz-border)" }}>
+            {["live","codesign","material"].map(v => (
+              <button key={v} onClick={() => setView(v)} style={{ padding: "6px 14px", border: "none", borderBottom: view === v ? `2px solid var(--rzz-primary)` : "2px solid transparent", marginBottom: -1, fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", textTransform: "uppercase", letterSpacing: 1.2, background: "transparent", color: view === v ? "var(--rzz-text)" : "var(--rzz-text-dim)" }}>{v === "codesign" ? "Co-Design" : v === "live" ? "Live" : "Material"}</button>
+            ))}
+          </div>
+          <ThemeToggle theme={theme} setTheme={setTheme} />
         </div>
       </div>
 
-      <div style={{ padding: 8, maxWidth: 1100, margin: "0 auto" }}>
+      <div style={{ padding: 10, maxWidth: 1100, margin: "0 auto" }}>
 
         {/* ═══ LIVE ═══ */}
-        {view === "live" && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-          <Box style={{ gridColumn: "1/-1" }}><Lbl>ENERGIEFLUSS · GEB. 42 + 52/53</Lbl><EnergyFlow d={cur} p={params} tick={tick} pvDachOn={pvDachOn} pvFreiraumOn={pvFreiraumOn} /></Box>
-          <Box><Lbl>ENERGIEVERLAUF</Lbl>
-            <ResponsiveContainer width="100%" height={120}>
+        {view === "live" && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <Box style={{ gridColumn: "1/-1" }}><Lbl>Energiefluss · Geb. 42 + 52/53</Lbl><EnergyFlow d={cur} p={params} tick={tick} pvDachOn={pvDachOn} pvFreiraumOn={pvFreiraumOn} /></Box>
+          <Box><Lbl>Energieverlauf</Lbl>
+            <ResponsiveContainer width="100%" height={140}>
               <AreaChart data={hist}>
                 <defs>
-                  <linearGradient id="gP" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#22d3ee" stopOpacity={.4}/><stop offset="100%" stopColor="#22d3ee" stopOpacity={0}/></linearGradient>
-                  <linearGradient id="gC" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#f87171" stopOpacity={.3}/><stop offset="100%" stopColor="#f87171" stopOpacity={0}/></linearGradient>
+                  <linearGradient id="gP" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={CI.coreBlue} stopOpacity={.55}/><stop offset="100%" stopColor={CI.coreBlue} stopOpacity={0}/></linearGradient>
+                  <linearGradient id="gC" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={CI.pulseRed} stopOpacity={.30}/><stop offset="100%" stopColor={CI.pulseRed} stopOpacity={0}/></linearGradient>
                 </defs>
-                <XAxis dataKey="label" tick={{ fill: "#1e293b", fontSize: 7 }} interval="preserveStartEnd" />
-                <YAxis tick={{ fill: "#1e293b", fontSize: 7 }} width={22} />
-                <Tooltip contentStyle={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 6, fontSize: 8, color: "#e2e8f0" }} />
-                <Area type="monotone" dataKey="pvTotal" stroke="#22d3ee" fill="url(#gP)" name="PV ges." strokeWidth={1.5} />
-                <Area type="monotone" dataKey="conTotal" stroke="#f87171" fill="url(#gC)" name="Verbr. ges." strokeWidth={1.5} />
+                <XAxis dataKey="label" tick={{ fill: "var(--rzz-text-dim)", fontSize: 9 }} interval="preserveStartEnd" stroke="var(--rzz-border)" />
+                <YAxis tick={{ fill: "var(--rzz-text-dim)", fontSize: 9 }} width={26} stroke="var(--rzz-border)" />
+                <Tooltip contentStyle={{ background: "var(--rzz-surface-2)", border: "1px solid var(--rzz-border-strong)", borderRadius: 6, fontSize: 10, color: "var(--rzz-text)", fontFamily: "'Geist Variable', sans-serif" }} />
+                <Area type="monotone" dataKey="pvTotal" stroke={CI.coreBlue} fill="url(#gP)" name="PV ges." strokeWidth={1.8} />
+                <Area type="monotone" dataKey="conTotal" stroke={CI.pulseRed} fill="url(#gC)" name="Verbr. ges." strokeWidth={1.8} />
               </AreaChart>
             </ResponsiveContainer>
           </Box>
-          <Box><Lbl>PARAMETER</Lbl>
-            {WHAT_IF.map(w => (<div key={w.id} style={{ marginBottom: 7 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, marginBottom: 2 }}><span style={{ color: "#94a3b8" }}>{w.label}</span><span style={{ color: "#22d3ee", fontWeight: 700 }}>{params[w.id]} {w.unit}</span></div>
-              <input type="range" min={w.min} max={w.max} step={w.step} value={params[w.id]} onChange={e => sp(w.id, e.target.value)} style={{ width: "100%", accentColor: "#22d3ee", height: 3 }} />
+          <Box><Lbl>Parameter</Lbl>
+            {WHAT_IF.map(w => (<div key={w.id} style={{ marginBottom: 9 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 3 }}><span style={{ color: "var(--rzz-text-dim)" }}>{w.label}</span><span style={{ color: "var(--rzz-text)", fontWeight: 700 }} className="rzz-mono">{params[w.id]} {w.unit}</span></div>
+              <input type="range" min={w.min} max={w.max} step={w.step} value={params[w.id]} onChange={e => sp(w.id, e.target.value)} style={{ width: "100%" }} />
             </div>))}
           </Box>
-          <Box style={{ gridColumn: "1/-1" }}><Lbl>SENSOREN + SPEICHER · GEB. 42</Lbl>
-            <div style={{ display: "flex", justifyContent: "space-around", flexWrap: "wrap", gap: 4 }}>
-              <Gauge value={sensors.temp} max={40} label="Temp" unit="°C" color="#f59e0b" warn={28} />
-              <Gauge value={sensors.humidity} max={100} label="Feuchte" unit="%rH" color="#3b82f6" warn={70} />
-              <Gauge value={sensors.co2} max={1500} label="CO₂" unit="ppm" color="#22c55e" warn={1000} />
-              <Gauge value={sensors.voc} max={500} label="VOC" unit="µg/m³" color="#a78bfa" warn={300} />
-              <Gauge value={cur.thStored} max={params.batteryTh || 1} label="Th. Speicher" unit="kWh" color="#fb923c" />
-              <Gauge value={cur.elStored} max={params.batteryEl || 1} label="El. Speicher" unit="kWh" color="#a78bfa" />
+          <Box style={{ gridColumn: "1/-1" }}><Lbl>Sensoren + Speicher · Geb. 42</Lbl>
+            <div style={{ display: "flex", justifyContent: "space-around", flexWrap: "wrap", gap: 6 }}>
+              <Gauge value={sensors.temp} max={40} label="Temp" unit="°C" color={CI.coreBlue} warn={28} />
+              <Gauge value={sensors.humidity} max={100} label="Feuchte" unit="%rH" color={CI.brightHorizon} warn={70} />
+              <Gauge value={sensors.co2} max={1500} label="CO₂" unit="ppm" color={CI.coreBlue} warn={1000} />
+              <Gauge value={sensors.voc} max={500} label="VOC" unit="µg/m³" color={CI.brightHorizon} warn={300} />
+              <Gauge value={cur.thStored} max={params.batteryTh || 1} label="Th. Speicher" unit="kWh" color={CI.coreBlue} />
+              <Gauge value={cur.elStored} max={params.batteryEl || 1} label="El. Speicher" unit="kWh" color={CI.brightHorizon} />
             </div>
           </Box>
         </div>}
 
         {/* ═══ CO-DESIGN ═══ */}
-        {view === "codesign" && <div style={{ display: "grid", gridTemplateColumns: "1fr 250px", gap: 8 }}>
+        {view === "codesign" && <div style={{ display: "grid", gridTemplateColumns: "1fr 250px", gap: 10 }}>
           <div style={{ gridColumn: "1/-1", display: "flex", gap: 2 }}>
-            {FLOORS.map(f => (<button key={f.id} onClick={() => { setSel(f.id); setSelectedWallId(null); }} style={{ padding: "4px 10px", borderRadius: "4px 4px 0 0", border: "1px solid", borderBottom: "none", background: sel === f.id ? f.color + "20" : "#0f172a", color: sel === f.id ? f.color : "#334155", borderColor: sel === f.id ? f.color + "55" : "#1e293b", fontSize: 8, cursor: "pointer", fontFamily: "inherit", fontWeight: sel === f.id ? 700 : 400 }}>{f.short}</button>))}
+            {FLOORS.map(f => (<button key={f.id} onClick={() => { setSel(f.id); setSelectedWallId(null); }} style={{ padding: "5px 12px", borderRadius: "4px 4px 0 0", border: "1px solid var(--rzz-border)", borderBottom: "none", background: sel === f.id ? "var(--rzz-surface)" : "transparent", color: sel === f.id ? "var(--rzz-text)" : "var(--rzz-text-dim)", fontSize: 10, cursor: "pointer", fontFamily: "inherit", fontWeight: sel === f.id ? 700 : 500, borderTop: sel === f.id ? `2px solid ${f.color}` : "1px solid var(--rzz-border)" }}>{f.short}</button>))}
           </div>
 
-          <Box style={{ borderColor: fl.color + "33" }}>
-            <div style={{ fontSize: 11, color: fl.color, marginBottom: 4, fontWeight: 600 }}>{fl.name}</div>
+          <Box>
+            <div style={{ fontSize: 12, color: "var(--rzz-text)", marginBottom: 6, fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ width: 10, height: 10, background: fl.color, borderRadius: 2 }} />{fl.name}
+            </div>
             {sel === "eg" && <EGPlan tick={tick} />}
             {sel === "dach" && <RoofPlan pvDachOn={pvDachOn} onTogglePvDach={() => setPvDachOn(p => !p)} pvFreiraumOn={pvFreiraumOn} onTogglePvFreiraum={() => setPvFreiraumOn(p => !p)} tick={tick} />}
             {!["eg", "dach"].includes(sel) && <>
               <OGPlan tick={tick} wallStates={wallStates} wallTypes={wallTypes} onWallClick={onWallClick} floor={fl} selectedWallId={selectedWallId} extWalls={extWalls} selectedExtSide={selectedExtSide} onExtSideClick={onExtSideClick} />
-              <div style={{ fontSize: 7, color: "#334155", marginTop: 4 }}>Klick = auswählen · Doppelklick = ein/aus · {aw}/{OG_WALLS_INIT.length} aktiv</div>
-              <div style={{ display: "flex", gap: 6, marginTop: 4, flexWrap: "wrap" }}>{wallTypes.filter(t => !t.isExterior).map(t => (<span key={t.id} style={{ fontSize: 7, color: "#64748b", display: "flex", alignItems: "center", gap: 3 }}><span style={{ width: 10, height: 3, background: t.color, borderRadius: 1 }} />{t.name}</span>))}</div>
+              <div style={{ fontSize: 9, color: "var(--rzz-text-dim)", marginTop: 5 }}>Klick = auswählen · Doppelklick = ein/aus · {aw}/{OG_WALLS_INIT.length} aktiv</div>
+              <div style={{ display: "flex", gap: 8, marginTop: 5, flexWrap: "wrap" }}>{wallTypes.filter(t => !t.isExterior).map(t => (<span key={t.id} style={{ fontSize: 9, color: "var(--rzz-text-dim)", display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 12, height: 3, background: t.color, borderRadius: 1 }} />{t.name}</span>))}</div>
             </>}
           </Box>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <Box style={{ maxHeight: 300, overflowY: "auto" }}>
-              <Lbl>WÄNDE / PV</Lbl>
-              {sel === "dach" ? <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <button onClick={() => setPvDachOn(p => !p)} style={{ width: "100%", padding: "6px", borderRadius: 4, border: `1px solid ${pvDachOn ? "#22d3ee" : "#334155"}`, background: pvDachOn ? "#22d3ee15" : "transparent", color: pvDachOn ? "#22d3ee" : "#475569", cursor: "pointer", fontFamily: "inherit", fontSize: 9, fontWeight: 600 }}>☀️ PV Dach {pvDachOn ? `aktiv · ${params.pvDach}kWp` : "aus"}</button>
-                <button onClick={() => setPvFreiraumOn(p => !p)} style={{ width: "100%", padding: "6px", borderRadius: 4, border: `1px solid ${pvFreiraumOn ? "#34d399" : "#334155"}`, background: pvFreiraumOn ? "#34d39915" : "transparent", color: pvFreiraumOn ? "#34d399" : "#475569", cursor: "pointer", fontFamily: "inherit", fontSize: 9, fontWeight: 600 }}>☀️ PV Freiraum {pvFreiraumOn ? `aktiv · ${params.pvFreiraum}kWp` : "aus"}</button>
-              </div> : sel === "eg" ? <div style={{ fontSize: 8, color: "#475569" }}>EG: Offener Grundriss</div> : <>
-                <div style={{ display: "flex", gap: 3, marginBottom: 5 }}>
-                  <button onClick={() => setWallStates(ws => { const n = { ...ws }; OG_WALLS_INIT.forEach(w => n[w.id] = { ...n[w.id], active: true }); return n; })} style={{ flex: 1, padding: "3px", borderRadius: 3, border: "1px solid #334155", background: "transparent", color: "#64748b", fontSize: 7, cursor: "pointer", fontFamily: "inherit" }}>Alle</button>
-                  <button onClick={() => setWallStates(ws => { const n = { ...ws }; OG_WALLS_INIT.forEach(w => n[w.id] = { ...n[w.id], active: false }); return n; })} style={{ flex: 1, padding: "3px", borderRadius: 3, border: "1px solid #334155", background: "transparent", color: "#64748b", fontSize: 7, cursor: "pointer", fontFamily: "inherit" }}>Open</button>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <Box style={{ maxHeight: 320, overflowY: "auto" }}>
+              <Lbl>Wände / PV</Lbl>
+              {sel === "dach" ? <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                <button onClick={() => setPvDachOn(p => !p)} style={{ width: "100%", padding: "7px", borderRadius: 4, border: `1px solid ${pvDachOn ? CI.coreBlue : "var(--rzz-border)"}`, background: pvDachOn ? CI.coreBlue : "transparent", color: pvDachOn ? "#FFFFFF" : "var(--rzz-text-dim)", cursor: "pointer", fontFamily: "inherit", fontSize: 10, fontWeight: 600 }}>PV Dach {pvDachOn ? `aktiv · ${params.pvDach} kWp` : "aus"}</button>
+                <button onClick={() => setPvFreiraumOn(p => !p)} style={{ width: "100%", padding: "7px", borderRadius: 4, border: `1px solid ${pvFreiraumOn ? CI.brightHorizon : "var(--rzz-border)"}`, background: pvFreiraumOn ? CI.brightHorizon : "transparent", color: pvFreiraumOn ? "#FFFFFF" : "var(--rzz-text-dim)", cursor: "pointer", fontFamily: "inherit", fontSize: 10, fontWeight: 600 }}>PV Freiraum {pvFreiraumOn ? `aktiv · ${params.pvFreiraum} kWp` : "aus"}</button>
+              </div> : sel === "eg" ? <div style={{ fontSize: 10, color: "var(--rzz-text-dim)" }}>EG: Offener Grundriss</div> : <>
+                <div style={{ display: "flex", gap: 4, marginBottom: 6 }}>
+                  <button onClick={() => setWallStates(ws => { const n = { ...ws }; OG_WALLS_INIT.forEach(w => n[w.id] = { ...n[w.id], active: true }); return n; })} style={{ flex: 1, padding: "4px", borderRadius: 3, border: "1px solid var(--rzz-border)", background: "transparent", color: "var(--rzz-text-dim)", fontSize: 9, cursor: "pointer", fontFamily: "inherit" }}>Alle</button>
+                  <button onClick={() => setWallStates(ws => { const n = { ...ws }; OG_WALLS_INIT.forEach(w => n[w.id] = { ...n[w.id], active: false }); return n; })} style={{ flex: 1, padding: "4px", borderRadius: 3, border: "1px solid var(--rzz-border)", background: "transparent", color: "var(--rzz-text-dim)", fontSize: 9, cursor: "pointer", fontFamily: "inherit" }}>Offen</button>
                 </div>
                 {OG_WALLS_INIT.map(w => { const ws = wallStates[w.id], on = ws?.active, wt = wallTypes.find(t => t.id === ws?.typeId), isSel = selectedWallId === w.id;
-                  return (<div key={w.id} style={{ marginBottom: 2, borderRadius: 4, border: `1px solid ${isSel ? fl.color : on ? (wt?.color || fl.color) + "44" : "#1e293b22"}`, background: isSel ? fl.color + "15" : "transparent", padding: "3px 5px" }}>
+                  return (<div key={w.id} style={{ marginBottom: 3, borderRadius: 4, border: `1px solid ${isSel ? CI.pulseRed : "var(--rzz-border)"}`, background: isSel ? "var(--rzz-surface-2)" : "transparent", padding: "4px 6px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }} onClick={() => setSelectedWallId(isSel ? null : w.id)}>
-                      <span style={{ fontSize: 8, color: on ? (wt?.color || fl.color) : "#334155", display: "flex", alignItems: "center", gap: 3 }}>{wt && <span style={{ width: 7, height: 3, background: wt.color, borderRadius: 1 }} />}{w.label}</span>
-                      <button onClick={e => { e.stopPropagation(); toggleWall(w.id); }} style={{ fontSize: 7, fontWeight: 700, color: on ? "#22c55e" : "#ef4444", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>{on ? "EIN" : "AUS"}</button>
+                      <span style={{ fontSize: 10, color: on ? "var(--rzz-text)" : "var(--rzz-text-mute)", display: "flex", alignItems: "center", gap: 4 }}>{wt && <span style={{ width: 10, height: 3, background: wt.color, borderRadius: 1 }} />}{w.label}</span>
+                      <button onClick={e => { e.stopPropagation(); toggleWall(w.id); }} style={{ fontSize: 9, fontWeight: 700, color: on ? CI.coreBlue : CI.pulseRed, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", letterSpacing: 0.5 }}>{on ? "EIN" : "AUS"}</button>
                     </div>
-                    {isSel && on && <div style={{ marginTop: 3, paddingTop: 3, borderTop: "1px solid #1e293b" }}>
-                      <div style={{ fontSize: 7, color: "#475569", marginBottom: 2 }}>Wandtyp:</div>
-                      {wallTypes.filter(t => !t.isExterior).map(t => (<button key={t.id} onClick={() => assignType(w.id, t.id)} style={{ display: "block", width: "100%", padding: "2px 5px", marginBottom: 1, borderRadius: 3, fontSize: 7, cursor: "pointer", fontFamily: "inherit", textAlign: "left", border: `1px solid ${ws.typeId === t.id ? t.color : "#1e293b"}`, background: ws.typeId === t.id ? t.color + "20" : "transparent", color: ws.typeId === t.id ? t.color : "#475569" }}><span style={{ width: 6, height: 3, background: t.color, borderRadius: 1, display: "inline-block", marginRight: 3 }} />{t.name}</button>))}
+                    {isSel && on && <div style={{ marginTop: 4, paddingTop: 4, borderTop: "1px solid var(--rzz-border)" }}>
+                      <div style={{ fontSize: 9, color: "var(--rzz-text-dim)", marginBottom: 3 }}>Wandtyp:</div>
+                      {wallTypes.filter(t => !t.isExterior).map(t => (<button key={t.id} onClick={() => assignType(w.id, t.id)} style={{ display: "block", width: "100%", padding: "3px 6px", marginBottom: 2, borderRadius: 3, fontSize: 9, cursor: "pointer", fontFamily: "inherit", textAlign: "left", border: `1px solid ${ws.typeId === t.id ? t.color : "var(--rzz-border)"}`, background: ws.typeId === t.id ? t.color : "transparent", color: ws.typeId === t.id ? "#FFFFFF" : "var(--rzz-text-dim)" }}><span style={{ width: 8, height: 3, background: ws.typeId === t.id ? "#FFFFFF" : t.color, borderRadius: 1, display: "inline-block", marginRight: 4 }} />{t.name}</button>))}
                     </div>}
                   </div>);
                 })}
@@ -500,26 +564,26 @@ export default function App() {
               const sideMeta = EXT_SIDES.find(s => s.id === selectedExtSide);
               const ew = extWalls[selectedExtSide];
               const sc = selSideCalc;
-              return <Box style={{ borderColor: selSideWT.color + "55" }}>
-                <Lbl style={{ color: selSideWT.color }}>AUSSENWAND · {sideMeta.label.toUpperCase()}</Lbl>
+              return <Box>
+                <Lbl style={{ color: CI.pulseRed }}>Aussenwand · {sideMeta.label}</Lbl>
                 {wallTypes.filter(t => t.isExterior).map(t => (
-                  <button key={t.id} onClick={() => setExtWalls(ew2 => ({ ...ew2, [selectedExtSide]: { ...ew2[selectedExtSide], typeId: t.id } }))} style={{ display: "block", width: "100%", padding: "2px 5px", marginBottom: 1, borderRadius: 3, fontSize: 7, cursor: "pointer", fontFamily: "inherit", textAlign: "left", border: `1px solid ${ew.typeId === t.id ? t.color : "#1e293b"}`, background: ew.typeId === t.id ? t.color + "20" : "transparent", color: ew.typeId === t.id ? t.color : "#475569" }}>
-                    <span style={{ width: 6, height: 3, background: t.color, borderRadius: 1, display: "inline-block", marginRight: 3 }} />{t.name}
+                  <button key={t.id} onClick={() => setExtWalls(ew2 => ({ ...ew2, [selectedExtSide]: { ...ew2[selectedExtSide], typeId: t.id } }))} style={{ display: "block", width: "100%", padding: "3px 6px", marginBottom: 2, borderRadius: 3, fontSize: 9, cursor: "pointer", fontFamily: "inherit", textAlign: "left", border: `1px solid ${ew.typeId === t.id ? t.color : "var(--rzz-border)"}`, background: ew.typeId === t.id ? t.color : "transparent", color: ew.typeId === t.id ? "#FFFFFF" : "var(--rzz-text-dim)" }}>
+                    <span style={{ width: 8, height: 3, background: ew.typeId === t.id ? "#FFFFFF" : t.color, borderRadius: 1, display: "inline-block", marginRight: 4 }} />{t.name}
                   </button>
                 ))}
                 {sc && <><WallSectionVis wt={selSideWT} />
-                  <div style={{ marginTop: 5, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 3 }}>
-                    <div style={{ fontSize: 7, color: "#475569" }}>U: <span style={{ color: "#22d3ee" }}>{sc.uValue.toFixed(3)}</span></div>
-                    <div style={{ fontSize: 7, color: "#475569" }}>GWP: <span style={{ color: sc.totalGWP < 0 ? "#22c55e" : "#f59e0b" }}>{sc.totalGWP.toFixed(2)}</span></div>
+                  <div style={{ marginTop: 6, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
+                    <div style={{ fontSize: 9, color: "var(--rzz-text-dim)" }}>U: <span className="rzz-mono" style={{ color: "var(--rzz-text)" }}>{sc.uValue.toFixed(3)}</span></div>
+                    <div style={{ fontSize: 9, color: "var(--rzz-text-dim)" }}>GWP: <span className="rzz-mono" style={{ color: sc.totalGWP < 0 ? CI.coreBlue : CI.pulseRed }}>{sc.totalGWP.toFixed(2)}</span></div>
                   </div></>}
-                <div style={{ marginTop: 6, paddingTop: 6, borderTop: "1px solid #1e293b" }}>
-                  <div style={{ fontSize: 7, color: "#475569", marginBottom: 3 }}>PUFFERZONE</div>
+                <div style={{ marginTop: 7, paddingTop: 7, borderTop: "1px solid var(--rzz-border)" }}>
+                  <div style={{ fontSize: 9, color: "var(--rzz-text-dim)", marginBottom: 4, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase" }}>Pufferzone</div>
                   {ew.bufferDepth === 0
-                    ? <button onClick={() => setExtWalls(ew2 => ({ ...ew2, [selectedExtSide]: { ...ew2[selectedExtSide], bufferDepth: 30 } }))} style={{ width: "100%", padding: "4px", borderRadius: 3, border: "2px dashed #334155", background: "transparent", color: "#64748b", fontSize: 8, cursor: "pointer", fontFamily: "inherit" }}>+ Pufferzone anlegen</button>
+                    ? <button onClick={() => setExtWalls(ew2 => ({ ...ew2, [selectedExtSide]: { ...ew2[selectedExtSide], bufferDepth: 30 } }))} style={{ width: "100%", padding: "5px", borderRadius: 3, border: "2px dashed var(--rzz-border-strong)", background: "transparent", color: "var(--rzz-text-dim)", fontSize: 10, cursor: "pointer", fontFamily: "inherit" }}>+ Pufferzone anlegen</button>
                     : <div>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
-                          <span style={{ fontSize: 7, color: selSideWT.color }}>{(ew.bufferDepth * 0.05).toFixed(1)} m Tiefe</span>
-                          <button onClick={() => setExtWalls(ew2 => ({ ...ew2, [selectedExtSide]: { ...ew2[selectedExtSide], bufferDepth: 0 } }))} style={{ fontSize: 8, background: "none", border: "none", color: "#ef4444", cursor: "pointer" }}>× entfernen</button>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                          <span className="rzz-mono" style={{ fontSize: 9, color: "var(--rzz-text)" }}>{(ew.bufferDepth * 0.05).toFixed(1)} m Tiefe</span>
+                          <button onClick={() => setExtWalls(ew2 => ({ ...ew2, [selectedExtSide]: { ...ew2[selectedExtSide], bufferDepth: 0 } }))} style={{ fontSize: 10, background: "none", border: "none", color: CI.pulseRed, cursor: "pointer" }}>× entfernen</button>
                         </div>
                         <input type="range" min="10" max="80" step="5" value={ew.bufferDepth} onChange={e => setExtWalls(ew2 => ({ ...ew2, [selectedExtSide]: { ...ew2[selectedExtSide], bufferDepth: +e.target.value } }))} style={{ width: "100%" }} />
                       </div>
@@ -528,61 +592,61 @@ export default function App() {
               </Box>;
             })()}
             {selectedWallId && wallStates[selectedWallId]?.active && (() => { const ws = wallStates[selectedWallId], wt = wallTypes.find(t => t.id === ws.typeId); if (!wt) return null; const c = calcWallType(wt);
-              return <Box><Lbl style={{ color: wt.color }}>{wt.name}</Lbl><WallSectionVis wt={wt} /><div style={{ marginTop: 5, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 3 }}>
-                <div style={{ fontSize: 7, color: "#475569" }}>Dicke: <span style={{ color: "#e2e8f0" }}>{c.totalThickness}mm</span></div>
-                <div style={{ fontSize: 7, color: "#475569" }}>U: <span style={{ color: "#22d3ee" }}>{c.uValue.toFixed(3)}</span></div>
-                <div style={{ fontSize: 7, color: "#475569" }}>GWP: <span style={{ color: c.totalGWP < 0 ? "#22c55e" : "#f59e0b" }}>{c.totalGWP.toFixed(2)}</span></div>
-                <div style={{ fontSize: 7, color: "#475569" }}>VOC: <span style={{ color: "#a78bfa" }}>{c.totalVOC}</span></div>
+              return <Box><Lbl style={{ color: CI.pulseRed }}>{wt.name}</Lbl><WallSectionVis wt={wt} /><div style={{ marginTop: 6, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
+                <div style={{ fontSize: 9, color: "var(--rzz-text-dim)" }}>Dicke: <span className="rzz-mono" style={{ color: "var(--rzz-text)" }}>{c.totalThickness} mm</span></div>
+                <div style={{ fontSize: 9, color: "var(--rzz-text-dim)" }}>U: <span className="rzz-mono" style={{ color: "var(--rzz-text)" }}>{c.uValue.toFixed(3)}</span></div>
+                <div style={{ fontSize: 9, color: "var(--rzz-text-dim)" }}>GWP: <span className="rzz-mono" style={{ color: c.totalGWP < 0 ? CI.coreBlue : CI.pulseRed }}>{c.totalGWP.toFixed(2)}</span></div>
+                <div style={{ fontSize: 9, color: "var(--rzz-text-dim)" }}>VOC: <span className="rzz-mono" style={{ color: "var(--rzz-text)" }}>{c.totalVOC}</span></div>
               </div></Box>;
             })()}
           </div>
 
-          <Box style={{ gridColumn: "1/-1" }}><Lbl>AUSWERTUNG · GEB. 42</Lbl>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 5 }}>
+          <Box style={{ gridColumn: "1/-1" }}><Lbl>Auswertung · Geb. 42</Lbl>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 6 }}>
               {[
-                { l: "GWP gesamt", v: `${(totalGWP/1000).toFixed(1)} t`, c: "#22d3ee" },
-                { l: "GWP/(m²·a)", v: `${(totalGWP/1500/50).toFixed(3)}`, c: "#22d3ee" },
-                { l: "U-Wert Außen", v: `${extCalc.uValue.toFixed(3)}`, c: extCalc.uValue < .2 ? "#22c55e" : "#f59e0b" },
-                { l: "Therm. Komfort", v: `${sensors.temp}°C`, c: parseFloat(sensors.temp) >= 20 && parseFloat(sensors.temp) <= 26 ? "#22c55e" : "#ef4444" },
-                { l: "VOC", v: `${sensors.voc} µg/m³`, c: parseFloat(sensors.voc) < 200 ? "#22c55e" : "#ef4444" },
-                { l: "Feuchte", v: `${sensors.humidity}%`, c: parseFloat(sensors.humidity) < 65 ? "#22c55e" : "#f59e0b" },
-                { l: "CO₂ Raum", v: `${sensors.co2} ppm`, c: parseFloat(sensors.co2) < 1000 ? "#22c55e" : "#ef4444" },
-                { l: "Th. Speicher", v: `${cur.thStored} kWh`, c: "#fb923c" },
-                { l: "El. Speicher", v: `${cur.elStored} kWh`, c: "#a78bfa" },
-                { l: "PV Dach", v: pvDachOn ? `${params.pvDach}kWp` : "–", c: pvDachOn ? "#22d3ee" : "#475569" },
-                { l: "PV Freiraum", v: pvFreiraumOn ? `${params.pvFreiraum}kWp` : "–", c: pvFreiraumOn ? "#34d399" : "#475569" },
-                { l: "Innenwände", v: `${aw}/${OG_WALLS_INIT.length}`, c: "#a78bfa" },
-              ].map((k, i) => (<div key={i} style={{ background: "#020617", borderRadius: 5, padding: 5, border: "1px solid #1e293b", textAlign: "center" }}><div style={{ fontSize: 6, color: "#334155", textTransform: "uppercase", letterSpacing: 1 }}>{k.l}</div><div style={{ fontSize: 12, fontWeight: 800, color: k.c, marginTop: 1 }}>{k.v}</div></div>))}
+                { l: "GWP gesamt", v: `${(totalGWP/1000).toFixed(1)} t`, c: CI.coreBlue },
+                { l: "GWP/(m²·a)", v: `${(totalGWP/1500/50).toFixed(3)}`, c: CI.coreBlue },
+                { l: "U-Wert Außen", v: `${extCalc.uValue.toFixed(3)}`, c: extCalc.uValue < .2 ? okColor : warnColor },
+                { l: "Therm. Komfort", v: `${sensors.temp}°C`, c: parseFloat(sensors.temp) >= 20 && parseFloat(sensors.temp) <= 26 ? okColor : warnColor },
+                { l: "VOC", v: `${sensors.voc} µg/m³`, c: parseFloat(sensors.voc) < 200 ? okColor : warnColor },
+                { l: "Feuchte", v: `${sensors.humidity}%`, c: parseFloat(sensors.humidity) < 65 ? okColor : warnColor },
+                { l: "CO₂ Raum", v: `${sensors.co2} ppm`, c: parseFloat(sensors.co2) < 1000 ? okColor : warnColor },
+                { l: "Th. Speicher", v: `${cur.thStored} kWh`, c: CI.brightHorizon },
+                { l: "El. Speicher", v: `${cur.elStored} kWh`, c: CI.brightHorizon },
+                { l: "PV Dach", v: pvDachOn ? `${params.pvDach} kWp` : "–", c: pvDachOn ? CI.coreBlue : CI.urbanAsh },
+                { l: "PV Freiraum", v: pvFreiraumOn ? `${params.pvFreiraum} kWp` : "–", c: pvFreiraumOn ? CI.brightHorizon : CI.urbanAsh },
+                { l: "Innenwände", v: `${aw}/${OG_WALLS_INIT.length}`, c: CI.urbanAsh },
+              ].map((k, i) => (<div key={i} style={{ background: "var(--rzz-surface-2)", borderRadius: 5, padding: 7, border: "1px solid var(--rzz-border)", textAlign: "center" }}><div style={{ fontSize: 8, color: "var(--rzz-text-dim)", textTransform: "uppercase", letterSpacing: 1, fontWeight: 600 }}>{k.l}</div><div className="rzz-mono" style={{ fontSize: 14, fontWeight: 800, color: k.c, marginTop: 2 }}>{k.v}</div></div>))}
             </div>
           </Box>
-          <Box style={{ gridColumn: "1/-1" }}><Lbl>SENSOREN + SPEICHER</Lbl>
-            <div style={{ display: "flex", justifyContent: "space-around", flexWrap: "wrap", gap: 4 }}>
-              <Gauge value={sensors.temp} max={40} label="Temp" unit="°C" color="#f59e0b" warn={28} />
-              <Gauge value={sensors.humidity} max={100} label="Feuchte" unit="%rH" color="#3b82f6" warn={70} />
-              <Gauge value={sensors.co2} max={1500} label="CO₂" unit="ppm" color="#22c55e" warn={1000} />
-              <Gauge value={sensors.voc} max={500} label="VOC" unit="µg/m³" color="#a78bfa" warn={300} />
-              <Gauge value={cur.thStored} max={params.batteryTh || 1} label="Th. Speicher" unit="kWh" color="#fb923c" />
-              <Gauge value={cur.elStored} max={params.batteryEl || 1} label="El. Speicher" unit="kWh" color="#a78bfa" />
+          <Box style={{ gridColumn: "1/-1" }}><Lbl>Sensoren + Speicher</Lbl>
+            <div style={{ display: "flex", justifyContent: "space-around", flexWrap: "wrap", gap: 6 }}>
+              <Gauge value={sensors.temp} max={40} label="Temp" unit="°C" color={CI.coreBlue} warn={28} />
+              <Gauge value={sensors.humidity} max={100} label="Feuchte" unit="%rH" color={CI.brightHorizon} warn={70} />
+              <Gauge value={sensors.co2} max={1500} label="CO₂" unit="ppm" color={CI.coreBlue} warn={1000} />
+              <Gauge value={sensors.voc} max={500} label="VOC" unit="µg/m³" color={CI.brightHorizon} warn={300} />
+              <Gauge value={cur.thStored} max={params.batteryTh || 1} label="Th. Speicher" unit="kWh" color={CI.coreBlue} />
+              <Gauge value={cur.elStored} max={params.batteryEl || 1} label="El. Speicher" unit="kWh" color={CI.brightHorizon} />
             </div>
           </Box>
         </div>}
 
         {/* ═══ MATERIAL ═══ */}
-        {view === "material" && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-          <Box style={{ gridColumn: "1/-1" }}><Lbl>WANDAUFBAU-KATALOG</Lbl>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 8 }}>
+        {view === "material" && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <Box style={{ gridColumn: "1/-1" }}><Lbl>Wandaufbau-Katalog</Lbl>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 10 }}>
               {wallTypes.map(wt => { const c = calcWallType(wt); return (
-                <div key={wt.id} style={{ background: "#020617", borderRadius: 6, padding: 10, border: `1px solid ${wt.color}33`, borderLeft: `3px solid ${wt.color}` }}>
-                  <div style={{ fontSize: 10, color: wt.color, fontWeight: 700, marginBottom: 5, display: "flex", justifyContent: "space-between" }}><span>{wt.name}</span><span style={{ fontSize: 8, color: "#475569", fontWeight: 400 }}>{wt.isExterior ? "Außen" : "Innen"}</span></div>
+                <div key={wt.id} style={{ background: "var(--rzz-surface-2)", borderRadius: 6, padding: 11, border: "1px solid var(--rzz-border)", borderLeft: `3px solid ${wt.color}` }}>
+                  <div style={{ fontSize: 12, color: "var(--rzz-text)", fontWeight: 700, marginBottom: 6, display: "flex", justifyContent: "space-between" }}><span>{wt.name}</span><span style={{ fontSize: 9, color: "var(--rzz-text-dim)", fontWeight: 500, textTransform: "uppercase", letterSpacing: 1 }}>{wt.isExterior ? "Außen" : "Innen"}</span></div>
                   <WallSectionVis wt={wt} />
-                  <div style={{ marginTop: 5, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 3 }}>
-                    <div style={{ fontSize: 7, color: "#475569" }}>Dicke<br /><span style={{ color: "#e2e8f0", fontSize: 10, fontWeight: 700 }}>{c.totalThickness}mm</span></div>
-                    <div style={{ fontSize: 7, color: "#475569" }}>U-Wert<br /><span style={{ color: "#22d3ee", fontSize: 10, fontWeight: 700 }}>{c.uValue.toFixed(3)}</span></div>
-                    <div style={{ fontSize: 7, color: "#475569" }}>GWP<br /><span style={{ color: c.totalGWP < 0 ? "#22c55e" : "#f59e0b", fontSize: 10, fontWeight: 700 }}>{c.totalGWP.toFixed(2)}</span></div>
+                  <div style={{ marginTop: 7, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 4 }}>
+                    <div style={{ fontSize: 9, color: "var(--rzz-text-dim)" }}>Dicke<br /><span className="rzz-mono" style={{ color: "var(--rzz-text)", fontSize: 12, fontWeight: 700 }}>{c.totalThickness} mm</span></div>
+                    <div style={{ fontSize: 9, color: "var(--rzz-text-dim)" }}>U-Wert<br /><span className="rzz-mono" style={{ color: CI.coreBlue, fontSize: 12, fontWeight: 700 }}>{c.uValue.toFixed(3)}</span></div>
+                    <div style={{ fontSize: 9, color: "var(--rzz-text-dim)" }}>GWP<br /><span className="rzz-mono" style={{ color: c.totalGWP < 0 ? CI.coreBlue : CI.pulseRed, fontSize: 12, fontWeight: 700 }}>{c.totalGWP.toFixed(2)}</span></div>
                   </div>
-                  <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 5 }}>
-                    <thead><tr>{["Schicht","mm","ρ","GWP","VOC","λ"].map((h,i) => <th key={i} style={{ fontSize: 6, color: "#334155", textAlign: i === 0 ? "left" : "right", padding: "2px 2px", borderBottom: "1px solid #1e293b" }}>{h}</th>)}</tr></thead>
-                    <tbody>{wt.layers.map((l, li) => (<tr key={li}><td style={{ fontSize: 7, color: "#94a3b8", padding: "1px 2px" }}>{l.name}</td><td style={{ fontSize: 7, color: "#e2e8f0", textAlign: "right", padding: "1px 2px", fontFamily: "monospace" }}>{l.thickness}</td><td style={{ fontSize: 7, color: "#64748b", textAlign: "right", padding: "1px 2px", fontFamily: "monospace" }}>{l.density}</td><td style={{ fontSize: 7, color: l.gwp < 0 ? "#22c55e" : "#f59e0b", textAlign: "right", padding: "1px 2px", fontFamily: "monospace" }}>{l.gwp}</td><td style={{ fontSize: 7, color: "#a78bfa", textAlign: "right", padding: "1px 2px", fontFamily: "monospace" }}>{l.voc}</td><td style={{ fontSize: 7, color: "#64748b", textAlign: "right", padding: "1px 2px", fontFamily: "monospace" }}>{l.lambda}</td></tr>))}</tbody>
+                  <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 7 }}>
+                    <thead><tr>{["Schicht","mm","ρ","GWP","VOC","λ"].map((h,i) => <th key={i} style={{ fontSize: 8, color: "var(--rzz-text-dim)", textAlign: i === 0 ? "left" : "right", padding: "3px 3px", borderBottom: "1px solid var(--rzz-border)", fontWeight: 600, textTransform: "uppercase", letterSpacing: 1 }}>{h}</th>)}</tr></thead>
+                    <tbody>{wt.layers.map((l, li) => (<tr key={li}><td style={{ fontSize: 9, color: "var(--rzz-text)", padding: "2px 3px" }}>{l.name}</td><td className="rzz-mono" style={{ fontSize: 9, color: "var(--rzz-text)", textAlign: "right", padding: "2px 3px" }}>{l.thickness}</td><td className="rzz-mono" style={{ fontSize: 9, color: "var(--rzz-text-dim)", textAlign: "right", padding: "2px 3px" }}>{l.density}</td><td className="rzz-mono" style={{ fontSize: 9, color: l.gwp < 0 ? CI.coreBlue : CI.pulseRed, textAlign: "right", padding: "2px 3px" }}>{l.gwp}</td><td className="rzz-mono" style={{ fontSize: 9, color: "var(--rzz-text-dim)", textAlign: "right", padding: "2px 3px" }}>{l.voc}</td><td className="rzz-mono" style={{ fontSize: 9, color: "var(--rzz-text-dim)", textAlign: "right", padding: "2px 3px" }}>{l.lambda}</td></tr>))}</tbody>
                   </table>
                 </div>
               );})}
@@ -590,46 +654,60 @@ export default function App() {
           </Box>
 
           <Box style={{ gridColumn: "1/-1" }}>
-            {!showNewType ? <button onClick={() => setShowNewType(true)} style={{ padding: "8px 16px", borderRadius: 5, border: "2px dashed #334155", background: "transparent", color: "#64748b", cursor: "pointer", fontFamily: "inherit", fontSize: 10, fontWeight: 600, width: "100%" }}>+ Neuen Wandaufbau erstellen</button> : <div>
-              <Lbl>NEUER WANDAUFBAU</Lbl>
-              <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
-                <div><div style={{ fontSize: 7, color: "#475569", marginBottom: 2 }}>Name</div><input value={newTypeName} onChange={e => setNewTypeName(e.target.value)} placeholder="z.B. Leichtbauwand" style={{ fontSize: 10, padding: "4px 8px", border: "1px solid #334155", borderRadius: 4, background: "#020617", color: "#e2e8f0", width: 180, fontFamily: "inherit" }} /></div>
-                <div><div style={{ fontSize: 7, color: "#475569", marginBottom: 2 }}>Farbe</div><input type="color" value={newTypeColor} onChange={e => setNewTypeColor(e.target.value)} style={{ width: 32, height: 28, border: "1px solid #334155", borderRadius: 4, background: "#020617", cursor: "pointer" }} /></div>
-                <div><div style={{ fontSize: 7, color: "#475569", marginBottom: 2 }}>Typ</div><button onClick={() => setNewTypeIsExterior(v => !v)} style={{ padding: "4px 10px", borderRadius: 4, border: `1px solid ${newTypeIsExterior ? "#f59e0b" : "#334155"}`, background: newTypeIsExterior ? "#f59e0b20" : "transparent", color: newTypeIsExterior ? "#f59e0b" : "#64748b", fontSize: 8, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>{newTypeIsExterior ? "Außenwand" : "Innenwand"}</button></div>
+            {!showNewType ? <button onClick={() => setShowNewType(true)} style={{ padding: "10px 16px", borderRadius: 5, border: "2px dashed var(--rzz-border-strong)", background: "transparent", color: "var(--rzz-text-dim)", cursor: "pointer", fontFamily: "inherit", fontSize: 11, fontWeight: 600, width: "100%" }}>+ Neuen Wandaufbau erstellen</button> : <div>
+              <Lbl>Neuer Wandaufbau</Lbl>
+              <div style={{ display: "flex", gap: 10, marginBottom: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+                <div><div style={{ fontSize: 9, color: "var(--rzz-text-dim)", marginBottom: 3, textTransform: "uppercase", letterSpacing: 1, fontWeight: 600 }}>Name</div><input value={newTypeName} onChange={e => setNewTypeName(e.target.value)} placeholder="z.B. Leichtbauwand" style={{ fontSize: 11, padding: "5px 9px", border: "1px solid var(--rzz-border-strong)", borderRadius: 4, background: "var(--rzz-bg)", color: "var(--rzz-text)", width: 200, fontFamily: "inherit" }} /></div>
+                <div><div style={{ fontSize: 9, color: "var(--rzz-text-dim)", marginBottom: 3, textTransform: "uppercase", letterSpacing: 1, fontWeight: 600 }}>Farbe</div><input type="color" value={newTypeColor} onChange={e => setNewTypeColor(e.target.value)} style={{ width: 34, height: 30, border: "1px solid var(--rzz-border-strong)", borderRadius: 4, background: "var(--rzz-bg)", cursor: "pointer" }} /></div>
+                <div><div style={{ fontSize: 9, color: "var(--rzz-text-dim)", marginBottom: 3, textTransform: "uppercase", letterSpacing: 1, fontWeight: 600 }}>Typ</div><button onClick={() => setNewTypeIsExterior(v => !v)} style={{ padding: "5px 11px", borderRadius: 4, border: `1px solid ${newTypeIsExterior ? CI.coreBlue : "var(--rzz-border-strong)"}`, background: newTypeIsExterior ? CI.coreBlue : "transparent", color: newTypeIsExterior ? "#FFFFFF" : "var(--rzz-text-dim)", fontSize: 10, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>{newTypeIsExterior ? "Außenwand" : "Innenwand"}</button></div>
               </div>
-              <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 8 }}>
-                <thead><tr>{["Schicht","mm","kg/m³","GWP","VOC","λ",""].map((h,i) => <th key={i} style={{ fontSize: 7, color: "#475569", textAlign: i === 0 ? "left" : "right", padding: "3px 3px", borderBottom: "1px solid #334155" }}>{h}</th>)}</tr></thead>
+              <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 10 }}>
+                <thead><tr>{["Schicht","mm","kg/m³","GWP","VOC","λ",""].map((h,i) => <th key={i} style={{ fontSize: 9, color: "var(--rzz-text-dim)", textAlign: i === 0 ? "left" : "right", padding: "4px 3px", borderBottom: "1px solid var(--rzz-border-strong)", fontWeight: 600, textTransform: "uppercase", letterSpacing: 1 }}>{h}</th>)}</tr></thead>
                 <tbody>{newTypeLayers.map((l, li) => (<tr key={li}>
                   {[{ k: "name", w: 110, type: "text" },{ k: "thickness", w: 45 },{ k: "density", w: 55 },{ k: "gwp", w: 45, step: .01 },{ k: "voc", w: 35 },{ k: "lambda", w: 45, step: .001 }].map(({ k, w, type, step }) => (
-                    <td key={k} style={{ padding: "2px 2px" }}><input type={type || "number"} value={l[k]} step={step} onChange={e => updateNewLayer(li, k, e.target.value)} style={{ width: w, fontSize: 9, padding: "3px 4px", border: "1px solid #334155", borderRadius: 3, background: "#020617", color: "#e2e8f0", fontFamily: "monospace", textAlign: type === "text" ? "left" : "right" }} /></td>
+                    <td key={k} style={{ padding: "2px 2px" }}><input type={type || "number"} value={l[k]} step={step} onChange={e => updateNewLayer(li, k, e.target.value)} style={{ width: w, fontSize: 10, padding: "4px 5px", border: "1px solid var(--rzz-border)", borderRadius: 3, background: "var(--rzz-bg)", color: "var(--rzz-text)", fontFamily: type === "text" ? "inherit" : "'Geist Mono Variable', monospace", textAlign: type === "text" ? "left" : "right" }} /></td>
                   ))}
-                  <td style={{ padding: "2px" }}>{newTypeLayers.length > 1 && <button onClick={() => setNewTypeLayers(ls => ls.filter((_, i) => i !== li))} style={{ fontSize: 10, background: "none", border: "none", color: "#475569", cursor: "pointer" }}>×</button>}</td>
+                  <td style={{ padding: "2px" }}>{newTypeLayers.length > 1 && <button onClick={() => setNewTypeLayers(ls => ls.filter((_, i) => i !== li))} style={{ fontSize: 11, background: "none", border: "none", color: CI.pulseRed, cursor: "pointer" }}>×</button>}</td>
                 </tr>))}</tbody>
               </table>
-              <div style={{ display: "flex", gap: 6 }}>
-                <button onClick={() => setNewTypeLayers(ls => [...ls, { name: `Schicht ${ls.length + 1}`, thickness: 15, density: 1000, gwp: 0.1, voc: 0, lambda: 0.5 }])} style={{ padding: "4px 10px", borderRadius: 3, border: "1px solid #334155", background: "transparent", color: "#64748b", fontSize: 8, cursor: "pointer", fontFamily: "inherit" }}>+ Schicht</button>
-                <button onClick={addNewWallType} disabled={!newTypeName.trim()} style={{ padding: "4px 14px", borderRadius: 3, border: "none", background: newTypeName.trim() ? "#22d3ee" : "#334155", color: "#020617", fontSize: 9, fontWeight: 700, cursor: newTypeName.trim() ? "pointer" : "default", fontFamily: "inherit" }}>Erstellen</button>
-                <button onClick={() => setShowNewType(false)} style={{ padding: "4px 10px", borderRadius: 3, border: "1px solid #334155", background: "transparent", color: "#64748b", fontSize: 8, cursor: "pointer", fontFamily: "inherit", marginLeft: "auto" }}>Abbrechen</button>
+              <div style={{ display: "flex", gap: 7 }}>
+                <button onClick={() => setNewTypeLayers(ls => [...ls, { name: `Schicht ${ls.length + 1}`, thickness: 15, density: 1000, gwp: 0.1, voc: 0, lambda: 0.5 }])} style={{ padding: "5px 11px", borderRadius: 3, border: "1px solid var(--rzz-border-strong)", background: "transparent", color: "var(--rzz-text-dim)", fontSize: 10, cursor: "pointer", fontFamily: "inherit" }}>+ Schicht</button>
+                <button onClick={addNewWallType} disabled={!newTypeName.trim()} style={{ padding: "5px 16px", borderRadius: 3, border: "none", background: newTypeName.trim() ? CI.coreBlue : "var(--rzz-border-strong)", color: "#FFFFFF", fontSize: 11, fontWeight: 700, cursor: newTypeName.trim() ? "pointer" : "default", fontFamily: "inherit" }}>Erstellen</button>
+                <button onClick={() => setShowNewType(false)} style={{ padding: "5px 11px", borderRadius: 3, border: "1px solid var(--rzz-border-strong)", background: "transparent", color: "var(--rzz-text-dim)", fontSize: 10, cursor: "pointer", fontFamily: "inherit", marginLeft: "auto" }}>Abbrechen</button>
               </div>
             </div>}
           </Box>
 
           <Box style={{ gridColumn: "1/-1", padding: 0, overflow: "hidden" }}>
-            <div style={{ fontSize: 10, color: "#475569", padding: "7px 10px", fontWeight: 600, letterSpacing: 1, borderBottom: "1px solid #1e293b", display: "flex", justifyContent: "space-between" }}><span>ÖKOBILANZ · GWP</span><span style={{ color: "#22d3ee", fontWeight: 400 }}>BNB 1.1.1</span></div>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 9 }}>
-              <thead><tr style={{ background: "#1e293b" }}>{["Bauteil","Wandtyp","Fläche m²","GWP/m²","GWP ges. kg CO₂"].map((h,i) => <th key={i} style={{ padding: "4px 6px", textAlign: i < 2 ? "left" : "right", color: i === 4 ? "#22d3ee" : "#64748b", fontSize: 8 }}>{h}</th>)}</tr></thead>
+            <div style={{ fontSize: 11, color: "var(--rzz-text-dim)", padding: "9px 12px", fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", borderBottom: "1px solid var(--rzz-border)", display: "flex", justifyContent: "space-between" }}><span>Ökobilanz · GWP</span><span style={{ color: "var(--rzz-text-mute)", fontWeight: 500, letterSpacing: 0.5 }}>BNB 1.1.1</span></div>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10 }}>
+              <thead><tr style={{ background: "var(--rzz-surface-inset)" }}>{["Bauteil","Wandtyp","Fläche m²","GWP/m²","GWP ges. kg CO₂"].map((h,i) => <th key={i} style={{ padding: "5px 7px", textAlign: i < 2 ? "left" : "right", color: "var(--rzz-text-dim)", fontSize: 9, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1 }}>{h}</th>)}</tr></thead>
               <tbody>
-                <tr style={{ borderBottom: "1px solid #1e293b" }}><td style={{ padding: "3px 6px", color: "#cbd5e1", fontWeight: 600 }}>Außenwand</td><td style={{ padding: "3px 6px", color: extWT.color, fontSize: 8 }}>{extWT.name}</td><td style={{ padding: "3px 6px", textAlign: "right", fontFamily: "monospace", color: "#64748b" }}>{extArea.toFixed(0)}</td><td style={{ padding: "3px 6px", textAlign: "right", fontFamily: "monospace", color: extCalc.totalGWP < 0 ? "#22c55e" : "#f59e0b" }}>{extCalc.totalGWP.toFixed(2)}</td><td style={{ padding: "3px 6px", textAlign: "right", fontFamily: "monospace", fontWeight: 700, color: "#22d3ee" }}>{(extCalc.totalGWP * extArea).toFixed(0)}</td></tr>
-                {wallTypes.filter(t => !t.isExterior).map(wt => { const ww = Object.entries(wallStates).filter(([_, ws]) => ws.active && ws.typeId === wt.id); if (!ww.length) return null; const c = calcWallType(wt), area = ww.length * 3.5 * 3.2 * 4;
-                  return <tr key={wt.id} style={{ borderBottom: "1px solid #1e293b22" }}><td style={{ padding: "3px 6px", color: "#94a3b8" }}>Innenwand ({ww.length}×)</td><td style={{ padding: "3px 6px", color: wt.color, fontSize: 8 }}>{wt.name}</td><td style={{ padding: "3px 6px", textAlign: "right", fontFamily: "monospace", color: "#64748b" }}>{area.toFixed(0)}</td><td style={{ padding: "3px 6px", textAlign: "right", fontFamily: "monospace", color: c.totalGWP < 0 ? "#22c55e" : "#f59e0b" }}>{c.totalGWP.toFixed(2)}</td><td style={{ padding: "3px 6px", textAlign: "right", fontFamily: "monospace", fontWeight: 700, color: "#22d3ee" }}>{(c.totalGWP * area).toFixed(0)}</td></tr>;
+                <tr style={{ borderBottom: "1px solid var(--rzz-border)" }}>
+                  <td style={{ padding: "4px 7px", color: "var(--rzz-text)", fontWeight: 600 }}>Außenwand</td>
+                  <td style={{ padding: "4px 7px", color: "var(--rzz-text)", fontSize: 9, display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 3, background: extWT.color, borderRadius: 1 }} />{extWT.name}</td>
+                  <td className="rzz-mono" style={{ padding: "4px 7px", textAlign: "right", color: "var(--rzz-text-dim)" }}>{extArea.toFixed(0)}</td>
+                  <td className="rzz-mono" style={{ padding: "4px 7px", textAlign: "right", color: extCalc.totalGWP < 0 ? CI.coreBlue : CI.pulseRed }}>{extCalc.totalGWP.toFixed(2)}</td>
+                  <td className="rzz-mono" style={{ padding: "4px 7px", textAlign: "right", fontWeight: 700, color: "var(--rzz-text)" }}>{(extCalc.totalGWP * extArea).toFixed(0)}</td>
+                </tr>
+                {wallTypes.filter(t => !t.isExterior).map(wt => { const ww = Object.entries(wallStates).filter(([, ws]) => ws.active && ws.typeId === wt.id); if (!ww.length) return null; const c = calcWallType(wt), area = ww.length * 3.5 * 3.2 * 4;
+                  return <tr key={wt.id} style={{ borderBottom: "1px solid var(--rzz-border)" }}>
+                    <td style={{ padding: "4px 7px", color: "var(--rzz-text-dim)" }}>Innenwand ({ww.length}×)</td>
+                    <td style={{ padding: "4px 7px", color: "var(--rzz-text)", fontSize: 9, display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 3, background: wt.color, borderRadius: 1 }} />{wt.name}</td>
+                    <td className="rzz-mono" style={{ padding: "4px 7px", textAlign: "right", color: "var(--rzz-text-dim)" }}>{area.toFixed(0)}</td>
+                    <td className="rzz-mono" style={{ padding: "4px 7px", textAlign: "right", color: c.totalGWP < 0 ? CI.coreBlue : CI.pulseRed }}>{c.totalGWP.toFixed(2)}</td>
+                    <td className="rzz-mono" style={{ padding: "4px 7px", textAlign: "right", fontWeight: 700, color: "var(--rzz-text)" }}>{(c.totalGWP * area).toFixed(0)}</td>
+                  </tr>;
                 })}
-                <tr style={{ borderTop: "2px solid #334155", background: "#0e749010" }}><td colSpan="4" style={{ padding: "4px 6px", fontWeight: 700, color: "#94a3b8" }}>∑ Gesamt</td><td style={{ padding: "4px 6px", textAlign: "right", fontFamily: "monospace", fontWeight: 800, fontSize: 12, color: "#22d3ee" }}>{totalGWP.toFixed(0)}</td></tr>
+                <tr style={{ borderTop: `2px solid ${CI.coreBlue}`, background: "var(--rzz-surface-inset)" }}>
+                  <td colSpan="4" style={{ padding: "6px 7px", fontWeight: 700, color: "var(--rzz-text)", letterSpacing: 1, textTransform: "uppercase", fontSize: 10 }}>∑ Gesamt</td>
+                  <td className="rzz-mono" style={{ padding: "6px 7px", textAlign: "right", fontWeight: 800, fontSize: 14, color: CI.coreBlue }}>{totalGWP.toFixed(0)}</td>
+                </tr>
               </tbody>
             </table>
           </Box>
         </div>}
       </div>
-      <style>{`input[type=range]{-webkit-appearance:none;background:#1e293b;border-radius:4px;outline:none}input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:#22d3ee;cursor:pointer;border:2px solid #020617}::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:#334155;border-radius:3px}input[type=number]::-webkit-inner-spin-button{opacity:.3}`}</style>
     </div>
   );
 }

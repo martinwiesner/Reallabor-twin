@@ -1,0 +1,96 @@
+@import "@fontsource-variable/geist/index.css";
+@import "@fontsource-variable/geist-mono/index.css";
+
+/* RZZ CI palette — Anhang02 (corrected) values */
+:root {
+  --rzz-core-blue:      #164194;
+  --rzz-bright-horizon: #3973B9;
+  --rzz-icy-breeze:     #A2D3F3;
+  --rzz-soft-sky:       #D4E8F7;
+  --rzz-pulse-red:      #EA5738;
+  --rzz-cloud-gray:     #E3E3E3;
+  --rzz-urban-ash:      #878787;
+  --rzz-deep-void:      #000000;
+}
+
+:root[data-theme="light"] {
+  --rzz-bg:          #FFFFFF;
+  --rzz-surface:     var(--rzz-cloud-gray);
+  --rzz-surface-2:   #FFFFFF;
+  --rzz-surface-inset:#F4F4F4;
+  --rzz-border:      rgba(135,135,135,0.30);
+  --rzz-border-strong: rgba(135,135,135,0.55);
+  --rzz-text:        var(--rzz-deep-void);
+  --rzz-text-dim:    var(--rzz-urban-ash);
+  --rzz-text-mute:   #B4B4B4;
+  --rzz-primary:     var(--rzz-core-blue);
+  --rzz-primary-2:   var(--rzz-bright-horizon);
+  --rzz-accent-soft: var(--rzz-icy-breeze);
+  --rzz-accent-softer: var(--rzz-soft-sky);
+  --rzz-alert:       var(--rzz-pulse-red);
+  --rzz-mute:        var(--rzz-urban-ash);
+  --rzz-on-primary:  #FFFFFF;
+}
+
+:root[data-theme="dark"] {
+  --rzz-bg:          var(--rzz-deep-void);
+  --rzz-surface:     #0E0E10;
+  --rzz-surface-2:   #1A1A1C;
+  --rzz-surface-inset:#050505;
+  --rzz-border:      rgba(135,135,135,0.30);
+  --rzz-border-strong: rgba(135,135,135,0.55);
+  --rzz-text:        #FFFFFF;
+  --rzz-text-dim:    var(--rzz-cloud-gray);
+  --rzz-text-mute:   var(--rzz-urban-ash);
+  --rzz-primary:     var(--rzz-bright-horizon);
+  --rzz-primary-2:   var(--rzz-icy-breeze);
+  --rzz-accent-soft: var(--rzz-soft-sky);
+  --rzz-accent-softer: rgba(212,232,247,0.15);
+  --rzz-alert:       var(--rzz-pulse-red);
+  --rzz-mute:        var(--rzz-urban-ash);
+  --rzz-on-primary:  var(--rzz-deep-void);
+}
+
+html, body, #root { background: var(--rzz-bg); color: var(--rzz-text); }
+
+body {
+  margin: 0;
+  font-family: 'Geist Variable', system-ui, -apple-system, sans-serif;
+  font-feature-settings: "ss01", "cv01";
+  -webkit-font-smoothing: antialiased;
+}
+
+input[type=range] {
+  -webkit-appearance: none;
+  background: var(--rzz-border);
+  border-radius: 4px;
+  outline: none;
+  height: 3px;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--rzz-primary);
+  cursor: pointer;
+  border: 2px solid var(--rzz-bg);
+}
+input[type=range]::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--rzz-primary);
+  cursor: pointer;
+  border: 2px solid var(--rzz-bg);
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-thumb { background: var(--rzz-border-strong); border-radius: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+input[type=number]::-webkit-inner-spin-button { opacity: .3; }
+
+.rzz-mono {
+  font-family: 'Geist Mono Variable', 'JetBrains Mono', ui-monospace, monospace;
+}
