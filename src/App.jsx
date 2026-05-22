@@ -123,14 +123,33 @@ function IFCViewer({ height = 280 }) {
       await fragments.init('/reallabor-twin/fragments-worker.mjs');
 
       const ifcLoader = components.get(OBC.IfcLoader);
-      await ifcLoader.setup({ wasm: { path: '/reallabor-twin/', absolute: true } });
+      // autoSetWasm:false → use our local public/web-ifc*.wasm instead of
+      // OBC's default unpkg fetch, which pulls a version-mismatched binary.
+      await ifcLoader.setup({
+        autoSetWasm: false,
+        wasm: { path: '/reallabor-twin/', absolute: true },
+      });
 
       const resp = await fetch('/reallabor-twin/models/building.ifc');
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const buffer = await resp.arrayBuffer();
-      const model = await ifcLoader.load(new Uint8Array(buffer));
-      world.scene.three.add(model);
-      world.camera.controls.fitToBox(model, true);
+      // load(bytes, autoCoordinate, modelId, options) — modelId is required;
+      // omitting it makes the fragments worker throw "Unsupported input type".
+      const model = await ifcLoader.load(new Uint8Array(buffer), true, 'building');
+      // FragmentsModel is a wrapper; the actual THREE.Object3D is model.object
+      world.scene.three.add(model.object);
+
+      // Tile-streamed rendering: drive fragments.core.update every frame so
+      // tiles stream in as the camera moves. Camera-event-only updates miss
+      // frustum changes between rest/update events and leave gaps.
+      world.renderer.onBeforeUpdate.add(() => fragments.core.update());
+      await fragments.core.update(true);
+
+      // model.box reads the stored bbox; use it for fitToBox once non-empty.
+      const box = model.box;
+      if (!box.isEmpty()) {
+        world.camera.controls.fitToBox(box, true);
+      }
       setLoading(false);
     }
 

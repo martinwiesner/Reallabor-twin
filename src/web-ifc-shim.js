@@ -1,7 +1,8 @@
 // web-ifc is loaded as a classic <script> in index.html (web-ifc-iife.js)
 // which sets globalThis.WebIFC before any module code runs.
-// IfcAPI is subclassed to force single-threaded WASM (avoids Import #0 "a" crash
-// when crossOriginIsolated is true without shared-memory support).
+// IfcAPI is subclassed to force single-threaded WASM — crossOriginIsolated
+// without SharedArrayBuffer support otherwise selects the MT factory and
+// fails with "Import #0 'a': module is not an object or function".
 const _w = globalThis.WebIFC ?? {};
 
 class _IfcAPI extends _w.IfcAPI {
