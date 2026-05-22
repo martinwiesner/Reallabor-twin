@@ -9,6 +9,9 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- Classic script runs before module scripts — web-ifc emscripten code
+         must NOT go through Vite's ESM transform (breaks WASM import object) -->
+    <script src="/web-ifc-iife.js"></script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

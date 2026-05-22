@@ -1,5 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import * as OBC from "@thatopen/components";
+import * as THREE from "three";
 
 // CI palette tokens — kept as JS constants so we can pass them to SVG/Recharts attributes
 // where CSS variables wouldn't resolve. Mirrors src/theme.css.
@@ -86,6 +88,69 @@ function calcWallType(wt) {
   const totalGWP = wt.layers.reduce((s, l) => s + (l.thickness / 1000) * l.density * l.gwp, 0);
   const totalVOC = wt.layers.reduce((s, l) => s + l.voc, 0);
   return { totalThickness, uValue, totalGWP, totalVOC };
+}
+
+function IFCViewer({ height = 280 }) {
+  const containerRef = useRef(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const container = containerRef.current;
+    const components = new OBC.Components();
+
+    const worlds = components.get(OBC.Worlds);
+    const world = worlds.create();
+    world.scene = new OBC.SimpleScene(components);
+    world.renderer = new OBC.SimpleRenderer(components, container);
+    world.camera = new OBC.SimpleCamera(components);
+
+    world.scene.setup();
+    world.scene.three.background = new THREE.Color('#0E0E10');
+    const dir = new THREE.DirectionalLight('#D4E8F7', 0.9);
+    dir.position.set(5, 10, 5);
+    world.scene.three.add(dir);
+
+    components.init();
+
+    // Remove the ThatOpen branding watermark
+    container.querySelector('[data-thatopen-logo]')?.remove();
+
+    async function load() {
+      // v3: FragmentsManager must be initialized before IfcLoader
+      const fragments = components.get(OBC.FragmentsManager);
+      await fragments.init('/reallabor-twin/fragments-worker.mjs');
+
+      const ifcLoader = components.get(OBC.IfcLoader);
+      await ifcLoader.setup({ wasm: { path: '/reallabor-twin/', absolute: true } });
+
+      const resp = await fetch('/reallabor-twin/models/building.ifc');
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const buffer = await resp.arrayBuffer();
+      const model = await ifcLoader.load(new Uint8Array(buffer));
+      world.scene.three.add(model);
+      world.camera.controls.fitToBox(model, true);
+      setLoading(false);
+    }
+
+    load().catch(err => { setError(err.message); setLoading(false); });
+
+    return () => { components.dispose(); };
+  }, []);
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height }}>
+      <div ref={containerRef} style={{ width: '100%', height, background: '#0E0E10', borderRadius: 4, overflow: 'hidden' }} />
+      {(loading || error) && (
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: error ? '#EA5738' : '#878787', fontSize: 11, fontFamily: 'inherit', letterSpacing: 1,
+          pointerEvents: 'none' }}>
+          {error ? `FEHLER: ${error}` : 'IFC-DATEI WIRD GELADEN …'}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function genEnergy(tick, p, pvDachOn, pvFreiraumOn) {
@@ -583,7 +648,8 @@ export default function App() {
 
         {/* ═══ LIVE ═══ */}
         {view === "live" && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          <Box style={{ gridColumn: "1/-1" }}><Lbl>Energiefluss · Geb. 42 + 52/53</Lbl><EnergyFlow d={cur} p={params} tick={tick} pvDachOn={pvDachOn} pvFreiraumOn={pvFreiraumOn} /></Box>
+          <Box><Lbl>Energiefluss · Geb. 42 + 52/53</Lbl><EnergyFlow d={cur} p={params} tick={tick} pvDachOn={pvDachOn} pvFreiraumOn={pvFreiraumOn} /></Box>
+          <Box><Lbl>3D · Geb. 42 / 52–53</Lbl><IFCViewer height={280} /></Box>
           <Box><Lbl>Energieverlauf</Lbl>
             <ResponsiveContainer width="100%" height={140}>
               <AreaChart data={hist}>
