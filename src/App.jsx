@@ -139,9 +139,11 @@ function IFCViewer({ height = 280 }) {
       // FragmentsModel is a wrapper; the actual THREE.Object3D is model.object
       world.scene.three.add(model.object);
 
-      // Tile-streamed rendering: drive fragments.core.update every frame so
-      // tiles stream in as the camera moves. Camera-event-only updates miss
-      // frustum changes between rest/update events and leave gaps.
+      // Bind LOD/culling to the camera and crank quality so all tiles load.
+      model.useCamera(world.camera.three);
+      model.graphicsQuality = 1;
+
+      // Drive tile updates every frame so streaming keeps up with camera motion.
       world.renderer.onBeforeUpdate.add(() => fragments.core.update());
       await fragments.core.update(true);
 
