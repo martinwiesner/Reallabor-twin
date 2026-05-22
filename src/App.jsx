@@ -229,9 +229,10 @@ function OGPlan({ tick, wallStates, wallTypes, onWallClick, floor, selectedWallI
         if (bo > 0) { if (x1 >= 490) x1 = 491 - bo; if (x2 >= 490) x2 = 491 - bo; }
         if (Math.abs(x2 - x1) < 2 && Math.abs(y2 - y1) < 2) return null;
         const on = ws.active, wt = wallTypes.find(t => t.id === ws.typeId), col = wt ? wt.color : c, isSel = selectedWallId === w.id;
-        const strokeCol = isSel ? CI.pulseRed : (on ? col : col+"33");
+        const showHighlight = isSel && on;
+        const strokeCol = showHighlight ? CI.pulseRed : (on ? col : col+"33");
         return (<g key={w.id} onClick={() => onWallClick(w.id)} style={{ cursor: "pointer" }}>
-          <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={strokeCol} strokeWidth={on?(isSel?5:3):1} strokeDasharray={on?"none":"5 4"}/>
+          <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={strokeCol} strokeWidth={on?(showHighlight?5:3):1} strokeDasharray={on?"none":"5 4"}/>
           <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="transparent" strokeWidth="14"/>
         </g>);
       })}
@@ -295,63 +296,161 @@ function WallSectionVis({ wt }) {
   );
 }
 
-/* ═══ ENERGY FLOW ═══ */
+/* ═══ ENERGY FLOW ═══
+   Sankey-style left → right: sources (left) → consumers (middle) → grid (right),
+   with storages directly below their associated building. Pulse Red is reserved
+   for the alert state on Netzbezug (grid draw > 50% of consumption) and the
+   Autarkie KPI (< 50%). Everything else is brand blue or Urban Ash neutral.
+*/
 function EnergyFlow({ d, p, tick, pvDachOn, pvFreiraumOn }) {
   const pu = Math.sin(tick * .3) * .5 + .5;
+  const autarky = d.conTotal > 0 ? Math.min(100, ((1 - d.grid / d.conTotal) * 100)) : 100;
+  const gridAlert = d.grid > Math.max(2, 0.5 * d.conTotal);
+  const autAlert = autarky < 50;
+
+  // Geometry — 520×160 viewBox, three columns
+  const SRC_X = 8, SRC_W = 88;             // sources column
+  const CON_X1 = 160, CON_X2 = 268, CON_W = 88; // consumer columns
+  const STO_W = 88;
+  const GRID_X = 408, GRID_W = 104;         // grid column
+  const ROW1_Y = 4,  ROW1_H = 28;           // PV Dach + Geb.42/52 + Netz
+  const ROW2_Y = 38, ROW2_H = 28;           // PV Freir.
+  const ROW3_Y = 78, ROW3_H = 34;           // Storages
+
   return (
-    <svg viewBox="0 0 520 220" style={{ width: "100%" }}>
-      {/* PV Dach */}
-      <rect x="80" y="2" width="90" height="28" rx="4" fill={pvDachOn ? CI.coreBlue : "transparent"} stroke={pvDachOn ? CI.coreBlue : CI.urbanAsh} strokeWidth="1" opacity={pvDachOn ? .85+pu*.15 : .5} />
-      <text x="125" y="13" textAnchor="middle" fill={pvDachOn ? "#FFFFFF" : CI.urbanAsh} fontSize="8" fontWeight="700" style={{ fontFamily: "'Geist Variable', sans-serif" }}>PV Dach</text>
-      <text x="125" y="25" textAnchor="middle" fill={pvDachOn ? "#FFFFFF" : CI.urbanAsh} fontSize="10" fontWeight="800" className="rzz-mono">{d.pvDach} kW</text>
-      {/* PV Freiraum */}
-      <rect x="190" y="2" width="90" height="28" rx="4" fill={pvFreiraumOn ? CI.brightHorizon : "transparent"} stroke={pvFreiraumOn ? CI.brightHorizon : CI.urbanAsh} strokeWidth="1" opacity={pvFreiraumOn ? .85+pu*.15 : .5} />
-      <text x="235" y="13" textAnchor="middle" fill={pvFreiraumOn ? "#FFFFFF" : CI.urbanAsh} fontSize="8" fontWeight="700" style={{ fontFamily: "'Geist Variable', sans-serif" }}>PV Freiraum</text>
-      <text x="235" y="25" textAnchor="middle" fill={pvFreiraumOn ? "#FFFFFF" : CI.urbanAsh} fontSize="10" fontWeight="800" className="rzz-mono">{d.pvFrei} kW</text>
+    <svg viewBox="0 0 520 160" preserveAspectRatio="xMidYMid meet"
+         style={{ width: "100%", maxWidth: 720, display: "block", margin: "0 auto" }}>
+      {/* ─── SOURCES (col A) ─── */}
+      <rect x={SRC_X} y={ROW1_Y} width={SRC_W} height={ROW1_H} rx="4"
+            fill={pvDachOn ? CI.coreBlue : "transparent"}
+            stroke={pvDachOn ? CI.coreBlue : CI.urbanAsh} strokeWidth="1"
+            opacity={pvDachOn ? .9 + pu * .1 : .5} />
+      <text x={SRC_X + SRC_W/2} y={ROW1_Y + 12} textAnchor="middle"
+            fill={pvDachOn ? "#FFFFFF" : CI.urbanAsh} fontSize="8" fontWeight="700"
+            style={{ fontFamily: "'Geist Variable', sans-serif", letterSpacing: .5 }}>PV Dach</text>
+      <text x={SRC_X + SRC_W/2} y={ROW1_Y + 24} textAnchor="middle"
+            fill={pvDachOn ? "#FFFFFF" : CI.urbanAsh} fontSize="11" fontWeight="800" className="rzz-mono">{d.pvDach} kW</text>
 
-      {/* Flows from PV down */}
-      {d.pvDach > .3 && <line x1="125" y1="31" x2="175" y2="60" stroke={CI.coreBlue} strokeWidth={1+d.pvDach/8} strokeDasharray="4 3" opacity={.5+pu*.4}><animate attributeName="stroke-dashoffset" from="14" to="0" dur=".7s" repeatCount="indefinite"/></line>}
-      {d.pvFrei > .3 && <line x1="235" y1="31" x2="195" y2="60" stroke={CI.brightHorizon} strokeWidth={1+d.pvFrei/8} strokeDasharray="4 3" opacity={.5+pu*.4}><animate attributeName="stroke-dashoffset" from="14" to="0" dur=".8s" repeatCount="indefinite"/></line>}
+      <rect x={SRC_X} y={ROW2_Y} width={SRC_W} height={ROW2_H} rx="4"
+            fill={pvFreiraumOn ? CI.brightHorizon : "transparent"}
+            stroke={pvFreiraumOn ? CI.brightHorizon : CI.urbanAsh} strokeWidth="1"
+            opacity={pvFreiraumOn ? .9 + pu * .1 : .5} />
+      <text x={SRC_X + SRC_W/2} y={ROW2_Y + 12} textAnchor="middle"
+            fill={pvFreiraumOn ? "#FFFFFF" : CI.urbanAsh} fontSize="8" fontWeight="700"
+            style={{ fontFamily: "'Geist Variable', sans-serif", letterSpacing: .5 }}>PV Freiraum</text>
+      <text x={SRC_X + SRC_W/2} y={ROW2_Y + 24} textAnchor="middle"
+            fill={pvFreiraumOn ? "#FFFFFF" : CI.urbanAsh} fontSize="11" fontWeight="800" className="rzz-mono">{d.pvFrei} kW</text>
 
-      {/* Geb 42 */}
-      <rect x="135" y="58" width="100" height="36" rx="5" fill={CI.icyBreeze} stroke={CI.brightHorizon} strokeWidth="1" />
-      <text x="185" y="72" textAnchor="middle" fill={CI.deepVoid} fontSize="8" fontWeight="700" style={{ fontFamily: "'Geist Variable', sans-serif" }}>Geb. 42</text>
-      <text x="185" y="86" textAnchor="middle" fill={CI.coreBlue} fontSize="11" fontWeight="800" className="rzz-mono">{d.con42} kW</text>
+      {/* ─── CONSUMERS (col B) ─── */}
+      {/* Geb. 42 — peer of Geb. 52/53, same fill */}
+      <rect x={CON_X1} y={ROW1_Y} width={CON_W} height={ROW1_H + ROW2_H + (ROW2_Y - ROW1_Y - ROW1_H)} rx="4"
+            fill={CI.icyBreeze} stroke={CI.brightHorizon} strokeWidth="1" />
+      <text x={CON_X1 + CON_W/2} y={ROW1_Y + 14} textAnchor="middle"
+            fill={CI.deepVoid} fontSize="9" fontWeight="700"
+            style={{ fontFamily: "'Geist Variable', sans-serif", letterSpacing: .5 }}>Geb. 42</text>
+      <text x={CON_X1 + CON_W/2} y={ROW1_Y + 38} textAnchor="middle"
+            fill={CI.coreBlue} fontSize="14" fontWeight="800" className="rzz-mono">{d.con42}</text>
+      <text x={CON_X1 + CON_W/2} y={ROW1_Y + 54} textAnchor="middle"
+            fill={CI.urbanAsh} fontSize="8" className="rzz-mono">kW</text>
 
-      {/* Geb 52/53 */}
-      <rect x="340" y="58" width="110" height="36" rx="5" fill={CI.softSky} stroke={CI.brightHorizon} strokeWidth="1" />
-      <text x="395" y="72" textAnchor="middle" fill={CI.deepVoid} fontSize="8" fontWeight="700" style={{ fontFamily: "'Geist Variable', sans-serif" }}>Geb. 52/53</text>
-      <text x="395" y="86" textAnchor="middle" fill={CI.coreBlue} fontSize="11" fontWeight="800" className="rzz-mono">{d.con52} kW</text>
+      {/* Geb. 52/53 — peer of Geb. 42, same fill */}
+      <rect x={CON_X2} y={ROW1_Y} width={CON_W} height={ROW1_H + ROW2_H + (ROW2_Y - ROW1_Y - ROW1_H)} rx="4"
+            fill={CI.icyBreeze} stroke={CI.brightHorizon} strokeWidth="1" />
+      <text x={CON_X2 + CON_W/2} y={ROW1_Y + 14} textAnchor="middle"
+            fill={CI.deepVoid} fontSize="9" fontWeight="700"
+            style={{ fontFamily: "'Geist Variable', sans-serif", letterSpacing: .5 }}>Geb. 52/53</text>
+      <text x={CON_X2 + CON_W/2} y={ROW1_Y + 38} textAnchor="middle"
+            fill={CI.coreBlue} fontSize="14" fontWeight="800" className="rzz-mono">{d.con52}</text>
+      <text x={CON_X2 + CON_W/2} y={ROW1_Y + 54} textAnchor="middle"
+            fill={CI.urbanAsh} fontSize="8" className="rzz-mono">kW</text>
 
-      {/* Flow Geb42 → Geb52 */}
-      <line x1="237" y1="76" x2="338" y2="76" stroke={CI.urbanAsh} strokeWidth="1.5" strokeDasharray="4 3" opacity={.4+pu*.4}><animate attributeName="stroke-dashoffset" from="14" to="0" dur=".9s" repeatCount="indefinite"/></line>
-      <text x="288" y="72" textAnchor="middle" fill={CI.urbanAsh} fontSize="7" style={{ fontFamily: "'Geist Variable', sans-serif" }}>Versorgung →</text>
+      {/* ─── STORAGES (col B, row 3) ─── */}
+      <rect x={CON_X1} y={ROW3_Y} width={STO_W} height={ROW3_H} rx="4"
+            fill={CI.softSky} stroke={CI.urbanAsh} strokeWidth="1" />
+      <text x={CON_X1 + STO_W/2} y={ROW3_Y + 11} textAnchor="middle"
+            fill={CI.deepVoid} fontSize="8" fontWeight="700"
+            style={{ fontFamily: "'Geist Variable', sans-serif", letterSpacing: .5 }}>El. Speicher</text>
+      <text x={CON_X1 + STO_W/2} y={ROW3_Y + 24} textAnchor="middle"
+            fill={CI.deepVoid} fontSize="10" fontWeight="800" className="rzz-mono">{d.elStored}/{p.batteryEl}</text>
+      <rect x={CON_X1 + 4} y={ROW3_Y + 28} width={STO_W - 8} height="3" rx="1.5" fill={CI.urbanAsh} opacity=".3"/>
+      <rect x={CON_X1 + 4} y={ROW3_Y + 28} width={Math.max(0, d.elSOC * (STO_W - 8) / 100)} height="3" rx="1.5"
+            fill={d.elSOC > 20 ? CI.coreBlue : CI.pulseRed}/>
 
-      {/* El. Speicher */}
-      <rect x="8" y="115" width="100" height="44" rx="5" fill="var(--rzz-surface-2)" stroke={CI.brightHorizon} strokeWidth="1" />
-      <text x="58" y="130" textAnchor="middle" fill={CI.brightHorizon} fontSize="8" fontWeight="700" style={{ fontFamily: "'Geist Variable', sans-serif" }}>El. Speicher</text>
-      <text x="58" y="146" textAnchor="middle" fill="var(--rzz-text)" fontSize="10" fontWeight="800" className="rzz-mono">{d.elStored} / {p.batteryEl} kWh</text>
-      <rect x="12" y="153" width="92" height="3" rx="1.5" fill={CI.urbanAsh} opacity=".3"/>
-      <rect x="12" y="153" width={Math.max(0,d.elSOC*.92)} height="3" rx="1.5" fill={d.elSOC>20 ? CI.coreBlue : CI.pulseRed}/>
+      <rect x={CON_X2} y={ROW3_Y} width={STO_W} height={ROW3_H} rx="4"
+            fill={CI.softSky} stroke={CI.urbanAsh} strokeWidth="1" />
+      <text x={CON_X2 + STO_W/2} y={ROW3_Y + 11} textAnchor="middle"
+            fill={CI.deepVoid} fontSize="8" fontWeight="700"
+            style={{ fontFamily: "'Geist Variable', sans-serif", letterSpacing: .5 }}>Th. Speicher</text>
+      <text x={CON_X2 + STO_W/2} y={ROW3_Y + 24} textAnchor="middle"
+            fill={CI.deepVoid} fontSize="10" fontWeight="800" className="rzz-mono">{d.thStored}/{p.batteryTh}</text>
+      <rect x={CON_X2 + 4} y={ROW3_Y + 28} width={STO_W - 8} height="3" rx="1.5" fill={CI.urbanAsh} opacity=".3"/>
+      <rect x={CON_X2 + 4} y={ROW3_Y + 28} width={Math.max(0, d.thSOC * (STO_W - 8) / 100)} height="3" rx="1.5"
+            fill={d.thSOC > 20 ? CI.coreBlue : CI.pulseRed}/>
 
-      {/* Th. Speicher */}
-      <rect x="130" y="115" width="110" height="44" rx="5" fill="var(--rzz-surface-2)" stroke={CI.brightHorizon} strokeWidth="1" />
-      <text x="185" y="130" textAnchor="middle" fill={CI.brightHorizon} fontSize="8" fontWeight="700" style={{ fontFamily: "'Geist Variable', sans-serif" }}>Therm. Speicher</text>
-      <text x="185" y="146" textAnchor="middle" fill="var(--rzz-text)" fontSize="10" fontWeight="800" className="rzz-mono">{d.thStored} / {p.batteryTh} kWh</text>
-      <rect x="134" y="153" width="102" height="3" rx="1.5" fill={CI.urbanAsh} opacity=".3"/>
-      <rect x="134" y="153" width={Math.max(0,d.thSOC*1.02)} height="3" rx="1.5" fill={d.thSOC>20 ? CI.coreBlue : CI.pulseRed}/>
+      {/* ─── GRID (col C) ─── */}
+      <rect x={GRID_X} y={ROW1_Y} width={GRID_W} height={ROW1_H + ROW2_H + (ROW2_Y - ROW1_Y - ROW1_H)} rx="4"
+            fill="var(--rzz-surface-2)"
+            stroke={gridAlert ? CI.pulseRed : CI.urbanAsh} strokeWidth={gridAlert ? 1.5 : 1} />
+      <text x={GRID_X + GRID_W/2} y={ROW1_Y + 14} textAnchor="middle"
+            fill={gridAlert ? CI.pulseRed : "var(--rzz-text-dim)"} fontSize="9" fontWeight="700"
+            style={{ fontFamily: "'Geist Variable', sans-serif", letterSpacing: .5 }}>Netzbezug</text>
+      <text x={GRID_X + GRID_W/2} y={ROW1_Y + 38} textAnchor="middle"
+            fill={gridAlert ? CI.pulseRed : "var(--rzz-text)"} fontSize="14" fontWeight="800" className="rzz-mono">{d.grid}</text>
+      <text x={GRID_X + GRID_W/2} y={ROW1_Y + 54} textAnchor="middle"
+            fill={CI.urbanAsh} fontSize="8" className="rzz-mono">kW</text>
 
-      {/* Netz */}
-      <rect x="350" y="115" width="100" height="44" rx="5" fill="var(--rzz-surface-2)" stroke={d.grid > 1 ? CI.pulseRed : CI.urbanAsh} strokeWidth="1" />
-      <text x="400" y="130" textAnchor="middle" fill={d.grid > 1 ? CI.pulseRed : CI.urbanAsh} fontSize="8" fontWeight="700" style={{ fontFamily: "'Geist Variable', sans-serif" }}>Netzbezug</text>
-      <text x="400" y="146" textAnchor="middle" fill={d.grid > 1 ? CI.pulseRed : "var(--rzz-text)"} fontSize="11" fontWeight="800" className="rzz-mono">{d.grid} kW</text>
+      {/* ─── AUTARKIE KPI (col C, lower) ─── */}
+      <text x={GRID_X + GRID_W/2} y={ROW3_Y + 4} textAnchor="middle"
+            fill={CI.urbanAsh} fontSize="8" fontWeight="600"
+            style={{ fontFamily: "'Geist Variable', sans-serif", letterSpacing: 1.5 }}>AUTARKIE</text>
+      <text x={GRID_X + GRID_W/2} y={ROW3_Y + 28} textAnchor="middle"
+            fill={autAlert ? CI.pulseRed : CI.coreBlue} fontSize="22" fontWeight="800" className="rzz-mono">{autarky.toFixed(0)}%</text>
 
-      {d.elSOC > 10 && <line x1="110" y1="135" x2="133" y2="76" stroke={CI.brightHorizon} strokeWidth="1.2" strokeDasharray="3 3" opacity={.4+pu*.3}><animate attributeName="stroke-dashoffset" from="10" to="0" dur="1s" repeatCount="indefinite"/></line>}
-      {d.grid > .5 && <line x1="348" y1="135" x2="345" y2="96" stroke={CI.pulseRed} strokeWidth={1+d.grid/6} strokeDasharray="4 3" opacity={.5+pu*.4}><animate attributeName="stroke-dashoffset" from="0" to="14" dur=".5s" repeatCount="indefinite"/></line>}
-
-      {/* Autarkie */}
-      <text x="280" y="180" textAnchor="middle" fill={CI.urbanAsh} fontSize="8" fontWeight="600" style={{ fontFamily: "'Geist Variable', sans-serif", letterSpacing: 1 }}>AUTARKIEGRAD GESAMT</text>
-      <text x="280" y="202" textAnchor="middle" fill={CI.coreBlue} fontSize="22" fontWeight="800" className="rzz-mono">{d.conTotal > 0 ? Math.min(100, ((1 - d.grid / d.conTotal) * 100)).toFixed(0) : 0}%</text>
+      {/* ─── FLOW LINES ─── */}
+      {/* PV Dach → Geb. 42 (right-down to consumer-left-edge midpoint at y=33) */}
+      {d.pvDach > .3 && (
+        <line x1={SRC_X + SRC_W} y1={ROW1_Y + ROW1_H/2} x2={CON_X1} y2={ROW1_Y + (ROW2_Y + ROW2_H - ROW1_Y) / 2}
+              stroke={CI.coreBlue} strokeWidth={1.5 + d.pvDach / 8} strokeDasharray="4 3" opacity={.6 + pu * .3}>
+          <animate attributeName="stroke-dashoffset" from="14" to="0" dur=".7s" repeatCount="indefinite"/>
+        </line>
+      )}
+      {/* PV Freir. → Geb. 42 (right-up) */}
+      {d.pvFrei > .3 && (
+        <line x1={SRC_X + SRC_W} y1={ROW2_Y + ROW2_H/2} x2={CON_X1} y2={ROW1_Y + (ROW2_Y + ROW2_H - ROW1_Y) / 2}
+              stroke={CI.brightHorizon} strokeWidth={1.5 + d.pvFrei / 8} strokeDasharray="4 3" opacity={.6 + pu * .3}>
+          <animate attributeName="stroke-dashoffset" from="14" to="0" dur=".8s" repeatCount="indefinite"/>
+        </line>
+      )}
+      {/* Geb. 42 → Geb. 52/53 (right, between consumer columns) */}
+      <line x1={CON_X1 + CON_W} y1={ROW1_Y + (ROW2_Y + ROW2_H - ROW1_Y) / 2}
+            x2={CON_X2} y2={ROW1_Y + (ROW2_Y + ROW2_H - ROW1_Y) / 2}
+            stroke={CI.urbanAsh} strokeWidth="1.5" strokeDasharray="4 3" opacity={.5 + pu * .3}>
+        <animate attributeName="stroke-dashoffset" from="14" to="0" dur=".9s" repeatCount="indefinite"/>
+      </line>
+      {/* Geb. 52/53 → Netzbezug — middle of Netzbezug's left side */}
+      <line x1={CON_X2 + CON_W} y1={ROW1_Y + (ROW2_Y + ROW2_H - ROW1_Y) / 2}
+            x2={GRID_X} y2={ROW1_Y + (ROW2_Y + ROW2_H - ROW1_Y) / 2}
+            stroke={gridAlert ? CI.pulseRed : CI.urbanAsh}
+            strokeWidth={gridAlert ? (1.5 + d.grid / 6) : 1.5}
+            strokeDasharray="4 3" opacity={.5 + pu * .4}>
+        <animate attributeName="stroke-dashoffset" from={gridAlert ? "0" : "14"} to={gridAlert ? "14" : "0"} dur=".6s" repeatCount="indefinite"/>
+      </line>
+      {/* Geb. 42 ↕ El. Speicher (vertical bidirectional) */}
+      {d.elSOC > 5 && (
+        <line x1={CON_X1 + CON_W/2} y1={ROW2_Y + ROW2_H + (ROW2_Y - ROW1_Y - ROW1_H) / 2 + ROW1_H/2 + 4}
+              x2={CON_X1 + CON_W/2} y2={ROW3_Y}
+              stroke={CI.brightHorizon} strokeWidth="1.2" strokeDasharray="3 3" opacity={.5 + pu * .3}>
+          <animate attributeName="stroke-dashoffset" from="10" to="0" dur="1s" repeatCount="indefinite"/>
+        </line>
+      )}
+      {/* Geb. 52/53 ↕ Th. Speicher (vertical bidirectional) */}
+      {d.thSOC > 5 && (
+        <line x1={CON_X2 + CON_W/2} y1={ROW2_Y + ROW2_H + (ROW2_Y - ROW1_Y - ROW1_H) / 2 + ROW1_H/2 + 4}
+              x2={CON_X2 + CON_W/2} y2={ROW3_Y}
+              stroke={CI.brightHorizon} strokeWidth="1.2" strokeDasharray="3 3" opacity={.5 + pu * .3}>
+          <animate attributeName="stroke-dashoffset" from="10" to="0" dur="1s" repeatCount="indefinite"/>
+        </line>
+      )}
     </svg>
   );
 }
@@ -490,13 +589,13 @@ export default function App() {
               <AreaChart data={hist}>
                 <defs>
                   <linearGradient id="gP" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={CI.coreBlue} stopOpacity={.55}/><stop offset="100%" stopColor={CI.coreBlue} stopOpacity={0}/></linearGradient>
-                  <linearGradient id="gC" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={CI.pulseRed} stopOpacity={.30}/><stop offset="100%" stopColor={CI.pulseRed} stopOpacity={0}/></linearGradient>
+                  <linearGradient id="gC" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={CI.urbanAsh} stopOpacity={.35}/><stop offset="100%" stopColor={CI.urbanAsh} stopOpacity={0}/></linearGradient>
                 </defs>
                 <XAxis dataKey="label" tick={{ fill: "var(--rzz-text-dim)", fontSize: 9 }} interval="preserveStartEnd" stroke="var(--rzz-border)" />
                 <YAxis tick={{ fill: "var(--rzz-text-dim)", fontSize: 9 }} width={26} stroke="var(--rzz-border)" />
                 <Tooltip contentStyle={{ background: "var(--rzz-surface-2)", border: "1px solid var(--rzz-border-strong)", borderRadius: 6, fontSize: 10, color: "var(--rzz-text)", fontFamily: "'Geist Variable', sans-serif" }} />
                 <Area type="monotone" dataKey="pvTotal" stroke={CI.coreBlue} fill="url(#gP)" name="PV ges." strokeWidth={1.8} />
-                <Area type="monotone" dataKey="conTotal" stroke={CI.pulseRed} fill="url(#gC)" name="Verbr. ges." strokeWidth={1.8} />
+                <Area type="monotone" dataKey="conTotal" stroke={CI.urbanAsh} fill="url(#gC)" name="Verbr. ges." strokeWidth={1.8} />
               </AreaChart>
             </ResponsiveContainer>
           </Box>
