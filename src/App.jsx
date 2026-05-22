@@ -120,13 +120,15 @@ function genEnergy(tick, p, pvDachOn, pvFreiraumOn) {
 }
 
 /* ═══ BRAND MARK ═══ */
-// 4-circle Signet — Handbuch arrangement (3 wheels + 1 carriage top-right).
+// 4-circle Signet per Handbuch page 4: hexagonal close-pack — two circles touching
+// horizontally on top, two touching horizontally on bottom, bottom pair shifted right
+// by half a diameter so the cleft (negative space) sits in the lower-left.
 const Signet = ({ size = 20, color = "currentColor" }) => (
   <svg width={size} height={size} viewBox="0 0 64 64" aria-label="RZZ Signet" role="img">
-    <circle cx="16" cy="44" r="12" fill={color} />
-    <circle cx="40" cy="44" r="12" fill={color} />
-    <circle cx="28" cy="20" r="12" fill={color} />
-    <circle cx="52" cy="20" r="12" fill={color} />
+    <circle cx="15" cy="23" r="11" fill={color} />
+    <circle cx="37" cy="23" r="11" fill={color} />
+    <circle cx="26" cy="42" r="11" fill={color} />
+    <circle cx="48" cy="42" r="11" fill={color} />
   </svg>
 );
 
