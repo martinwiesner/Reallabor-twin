@@ -52,6 +52,37 @@ const DEFAULT_WALL_TYPES = [
       { name: "Lehmputz", thickness: 15, density: 1600, gwp: 0.02, voc: 0, lambda: 0.91 },
     ],
   },
+  { id: "aw2", name: "Außenwand (Holzrahmen-Zellulose)", isExterior: true, color: CI.brightHorizon,
+    layers: [
+      { name: "Holzfaser-Putzträgerplatte", thickness: 60, density: 180, gwp: -1.20, voc: 2, lambda: 0.042 },
+      { name: "Holzständer + Zellulose", thickness: 240, density: 55, gwp: -1.40, voc: 1, lambda: 0.040 },
+      { name: "OSB/3 (Aussteifung & Dampfbremse)", thickness: 15, density: 620, gwp: -0.95, voc: 8, lambda: 0.13 },
+      { name: "Installationsebene + Mineralwolle", thickness: 60, density: 30, gwp: 1.16, voc: 3, lambda: 0.035 },
+      { name: "Gipsfaserplatte", thickness: 15, density: 1180, gwp: 0.12, voc: 1, lambda: 0.32 },
+    ],
+  },
+  { id: "aw3", name: "Außenwand (Stahlbeton + WDVS-EPS)", isExterior: true, color: CI.pulseRed,
+    layers: [
+      { name: "Silikatputz (mineralisch)", thickness: 8, density: 1700, gwp: 0.20, voc: 4, lambda: 0.87 },
+      { name: "EPS-Hartschaum 035", thickness: 160, density: 20, gwp: 2.65, voc: 10, lambda: 0.035 },
+      { name: "Stahlbeton C25/30", thickness: 200, density: 2400, gwp: 0.137, voc: 0, lambda: 2.30 },
+      { name: "Gipsputz", thickness: 15, density: 1200, gwp: 0.13, voc: 2, lambda: 0.51 },
+    ],
+  },
+  { id: "iw2", name: "Innenwand (Kalksandstein KS-12)", isExterior: false, color: CI.cloudGray,
+    layers: [
+      { name: "Gipsputz", thickness: 10, density: 1200, gwp: 0.13, voc: 2, lambda: 0.51 },
+      { name: "Kalksandstein RDK 1.8", thickness: 175, density: 1800, gwp: 0.158, voc: 0, lambda: 0.99 },
+      { name: "Gipsputz", thickness: 10, density: 1200, gwp: 0.13, voc: 2, lambda: 0.51 },
+    ],
+  },
+  { id: "iw3", name: "Innenwand (GK-Metallständer F90)", isExterior: false, color: CI.icyBreeze,
+    layers: [
+      { name: "Gipskartonplatte (2× 12,5 mm)", thickness: 25, density: 900, gwp: 0.29, voc: 2, lambda: 0.21 },
+      { name: "CW-Profil + Mineralwolle", thickness: 75, density: 18, gwp: 1.16, voc: 3, lambda: 0.035 },
+      { name: "Gipskartonplatte (2× 12,5 mm)", thickness: 25, density: 900, gwp: 0.29, voc: 2, lambda: 0.21 },
+    ],
+  },
 ];
 
 const OG_WALLS_INIT = [
