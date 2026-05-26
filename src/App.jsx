@@ -174,6 +174,112 @@ function IFCViewer({ height = 280 }) {
   );
 }
 
+// Top-down floor-plan view using @thatopen/components Views.createFromIfcStoreys.
+// Spike: renders whatever the library defaults give us (ortho cam + clipping plane
+// per IfcBuildingStorey). Phase B will add ClipEdges + Hider + Highlighter.
+function IFCPlanView({ height = 360, selectedFloorId }) {
+  const containerRef = useRef(null);
+  const stateRef = useRef({ components: null, views: null, storeyViews: [] });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [storeyIds, setStoreyIds] = useState([]);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const container = containerRef.current;
+    const components = new OBC.Components();
+
+    const worlds = components.get(OBC.Worlds);
+    const world = worlds.create();
+    world.scene = new OBC.SimpleScene(components);
+    world.renderer = new OBC.SimpleRenderer(components, container);
+    world.camera = new OBC.SimpleCamera(components);
+
+    world.scene.setup();
+    world.scene.three.background = new THREE.Color('#0E0E10');
+    const dir = new THREE.DirectionalLight('#D4E8F7', 0.9);
+    dir.position.set(5, 10, 5);
+    world.scene.three.add(dir);
+
+    components.init();
+    container.querySelector('[data-thatopen-logo]')?.remove();
+
+    let disposed = false;
+    async function load() {
+      const fragments = components.get(OBC.FragmentsManager);
+      await fragments.init('/reallabor-twin/fragments-worker.mjs');
+
+      const ifcLoader = components.get(OBC.IfcLoader);
+      await ifcLoader.setup({
+        autoSetWasm: false,
+        wasm: { path: '/reallabor-twin/', absolute: true },
+      });
+
+      const resp = await fetch('/reallabor-twin/models/building.ifc');
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const buffer = await resp.arrayBuffer();
+      const model = await ifcLoader.load(new Uint8Array(buffer), true, 'planview');
+      if (disposed) return;
+
+      world.scene.three.add(model.object);
+      model.useCamera(world.camera.three);
+      model.graphicsQuality = 1;
+      world.renderer.onBeforeUpdate.add(() => fragments.core.update());
+      await fragments.core.update(true);
+
+      const views = components.get(OBC.Views);
+      views.world = world;
+      const created = await views.createFromIfcStoreys();
+      console.log('[IFCPlanView] createFromIfcStoreys →', created.map(v => v.id));
+
+      stateRef.current = { components, views, storeyViews: created };
+      setStoreyIds(created.map(v => v.id));
+      setLoading(false);
+    }
+
+    load().catch(err => {
+      console.error('[IFCPlanView]', err);
+      setError(err.message);
+      setLoading(false);
+    });
+
+    return () => { disposed = true; components.dispose(); };
+  }, []);
+
+  // Open the storey view that best matches selectedFloorId (e.g. '1og').
+  useEffect(() => {
+    const { views, storeyViews } = stateRef.current;
+    if (!views || !storeyViews?.length || !selectedFloorId) return;
+    const want = selectedFloorId.toLowerCase();
+    const match =
+      storeyViews.find(v => v.id.toLowerCase().includes(want)) ??
+      storeyViews.find(v => v.id.toLowerCase().includes(want.replace('og', ''))) ??
+      storeyViews[0];
+    views.close();
+    views.open(match.id);
+  }, [selectedFloorId, storeyIds]);
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height }}>
+      <div ref={containerRef} style={{ width: '100%', height, background: '#0E0E10', borderRadius: 4, overflow: 'hidden' }} />
+      {(loading || error) && (
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: error ? '#EA5738' : '#878787', fontSize: 11, fontFamily: 'inherit', letterSpacing: 1,
+          pointerEvents: 'none' }}>
+          {error ? `FEHLER: ${error}` : 'IFC-PLANANSICHT WIRD GELADEN …'}
+        </div>
+      )}
+      {!loading && !error && storeyIds.length > 0 && (
+        <div style={{ position: 'absolute', top: 4, right: 6, fontSize: 9, color: '#878787',
+          background: 'rgba(0,0,0,.55)', padding: '2px 6px', borderRadius: 2,
+          fontFamily: 'inherit', letterSpacing: 0.5, pointerEvents: 'none' }}>
+          {storeyIds.length} Geschoss{storeyIds.length === 1 ? '' : 'e'} · IFC
+        </div>
+      )}
+    </div>
+  );
+}
+
 function genEnergy(tick, p, pvDachOn, pvFreiraumOn) {
   const h = (tick * 0.5) % 24;
   const sun = Math.max(0, Math.sin((h - 6) / 12 * Math.PI));
@@ -717,7 +823,16 @@ export default function App() {
             {sel === "eg" && <EGPlan tick={tick} />}
             {sel === "dach" && <RoofPlan pvDachOn={pvDachOn} onTogglePvDach={() => setPvDachOn(p => !p)} pvFreiraumOn={pvFreiraumOn} onTogglePvFreiraum={() => setPvFreiraumOn(p => !p)} tick={tick} />}
             {!["eg", "dach"].includes(sel) && <>
-              <OGPlan tick={tick} wallStates={wallStates} wallTypes={wallTypes} onWallClick={onWallClick} floor={fl} selectedWallId={selectedWallId} extWalls={extWalls} selectedExtSide={selectedExtSide} onExtSideClick={onExtSideClick} />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                <div>
+                  <div style={{ fontSize: 9, color: "var(--rzz-text-dim)", marginBottom: 4, letterSpacing: 1, textTransform: "uppercase" }}>SVG · Stil (Mock)</div>
+                  <OGPlan tick={tick} wallStates={wallStates} wallTypes={wallTypes} onWallClick={onWallClick} floor={fl} selectedWallId={selectedWallId} extWalls={extWalls} selectedExtSide={selectedExtSide} onExtSideClick={onExtSideClick} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 9, color: "var(--rzz-text-dim)", marginBottom: 4, letterSpacing: 1, textTransform: "uppercase" }}>IFC · Views.createFromIfcStoreys (Spike)</div>
+                  <IFCPlanView height={250} selectedFloorId={sel} />
+                </div>
+              </div>
               <div style={{ fontSize: 9, color: "var(--rzz-text-dim)", marginTop: 5 }}>Klick = auswählen · Doppelklick = ein/aus · {aw}/{OG_WALLS_INIT.length} aktiv</div>
               <div style={{ display: "flex", gap: 8, marginTop: 5, flexWrap: "wrap" }}>{wallTypes.filter(t => !t.isExterior).map(t => (<span key={t.id} style={{ fontSize: 9, color: "var(--rzz-text-dim)", display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 12, height: 3, background: t.color, borderRadius: 1 }} />{t.name}</span>))}</div>
             </>}
