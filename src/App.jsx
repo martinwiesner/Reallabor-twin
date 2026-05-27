@@ -680,13 +680,18 @@ const HConnLine = ({ color }) => (
   </div>
 );
 
-/* Two converging dashed lines from the stacked PV cards into Geb.42's left midline.
-   viewBox is laid out for a ~168px-tall column (BigCard 96 + gap 10 + SoC ~62);
-   preserveAspectRatio="none" lets the SVG stretch to whatever the row resolves to. */
+/* Two horizontal stubs from each PV card's right-middle, meeting at a vertical
+   spine, then a single line continuing to Geb.42's left midline. Fixed pixels
+   (no viewBox stretching) so y positions track the actual card centers:
+     - PV Dach card height ~52, center at y=26
+     - PV Freiraum 10px below, center at y=88
+     - Geb.42 BigCard minHeight 96, midline at y=48 */
 const HConnPV = () => (
-  <svg width="100%" height="100%" viewBox="0 0 36 168" preserveAspectRatio="none" style={{ display: "block" }}>
-    <line x1="0" y1="28"  x2="36" y2="48" stroke="#B6BABF" strokeWidth="1.4" strokeDasharray="3 3" strokeLinecap="round" />
-    <line x1="0" y1="88"  x2="36" y2="48" stroke="#B6BABF" strokeWidth="1.4" strokeDasharray="3 3" strokeLinecap="round" />
+  <svg width="36" height="200" viewBox="0 0 36 200" style={{ display: "block", overflow: "visible" }}>
+    <line x1="0"  y1="26" x2="22" y2="26" stroke="#B6BABF" strokeWidth="1.4" strokeDasharray="3 3" strokeLinecap="round" />
+    <line x1="0"  y1="88" x2="22" y2="88" stroke="#B6BABF" strokeWidth="1.4" strokeDasharray="3 3" strokeLinecap="round" />
+    <line x1="22" y1="26" x2="22" y2="88" stroke="#B6BABF" strokeWidth="1.4" strokeDasharray="3 3" strokeLinecap="round" />
+    <line x1="22" y1="48" x2="36" y2="48" stroke="#B6BABF" strokeWidth="1.4" strokeDasharray="3 3" strokeLinecap="round" />
   </svg>
 );
 
