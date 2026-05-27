@@ -1030,7 +1030,7 @@ export default function App() {
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-            <Box>
+            <Box style={{ height: 285, overflowY: "auto" }}>
               <Lbl>Wände / PV</Lbl>
               {sel === "dach" ? <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                 <button onClick={() => setPvDachOn(p => !p)} style={{ width: "100%", padding: "7px", borderRadius: 4, border: `1px solid ${pvDachOn ? CI.coreBlue : "var(--rzz-border)"}`, background: pvDachOn ? CI.coreBlue : "transparent", color: pvDachOn ? "#FFFFFF" : "var(--rzz-text-dim)", cursor: "pointer", fontFamily: "inherit", fontSize: 10, fontWeight: 600 }}>PV Dach {pvDachOn ? `aktiv · ${params.pvDach} kWp` : "aus"}</button>
