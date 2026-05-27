@@ -669,21 +669,45 @@ const HSocCard = ({ label, value, unit, soc, socColor }) => (
   </div>
 );
 
+/* Connector wiring — dashed line between the BigCard row, vertically centered.
+   The cell stretches to the column height; the inner 96px row matches BigCard.minHeight
+   so the line lands on the card's vertical midline. */
+const HConnLine = ({ color }) => (
+  <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+    <div style={{ height: 96, display: "flex", alignItems: "center" }}>
+      <div style={{ width: "100%", borderTop: `1.5px dashed ${color || "#B6BABF"}` }} />
+    </div>
+  </div>
+);
+
+/* Two converging dashed lines from the stacked PV cards into Geb.42's left midline.
+   viewBox is laid out for a ~168px-tall column (BigCard 96 + gap 10 + SoC ~62);
+   preserveAspectRatio="none" lets the SVG stretch to whatever the row resolves to. */
+const HConnPV = () => (
+  <svg width="100%" height="100%" viewBox="0 0 36 168" preserveAspectRatio="none" style={{ display: "block" }}>
+    <line x1="0" y1="28"  x2="36" y2="48" stroke="#B6BABF" strokeWidth="1.4" strokeDasharray="3 3" strokeLinecap="round" />
+    <line x1="0" y1="88"  x2="36" y2="48" stroke="#B6BABF" strokeWidth="1.4" strokeDasharray="3 3" strokeLinecap="round" />
+  </svg>
+);
+
 function HermannEnergyFlow({ d, p, autarky }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "175px 1fr 1fr 1fr", gap: 16, alignItems: "stretch" }}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 10, justifyContent: "center" }}>
+    <div style={{ display: "grid", gridTemplateColumns: "175px 36px 1fr 28px 1fr 28px 1fr", gap: 0, alignItems: "stretch" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         <HSrcCard Icon={IconPV} label="PV Dach" value={`${d.pvDach} kW`} />
         <HSrcCard Icon={IconSun} label="PV Freiraum" value={`${d.pvFrei} kW`} />
       </div>
+      <HConnPV />
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         <HBigCard label="Geb. 42" value={d.con42} unit="kW" tint={H.tintGreen} />
         <HSocCard label="El. Speicher" value={`${d.elStored}/${p.batteryEl}`} unit="kWh" soc={d.elSOC} socColor={H.textMute} />
       </div>
+      <HConnLine />
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         <HBigCard label="Geb. 52/53" value={d.con52} unit="kW" tint={H.tintBlue} />
         <HSocCard label="Th. Speicher" value={`${d.thStored}/${p.batteryTh}`} unit="kWh" soc={d.thSOC} socColor={H.blue} />
       </div>
+      <HConnLine color={H.amber} />
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         <HBigCard label="Netzbezug" value={d.grid} unit="kW" tint={H.tintCream} valueColor={H.amberDark} labelColor={H.amberDark} />
         <div style={{ textAlign: "center", padding: "6px 0 4px" }}>
