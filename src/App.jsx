@@ -796,7 +796,9 @@ export default function App() {
   const [wallTypes, setWallTypes] = useState(DEFAULT_WALL_TYPES);
   const [wallStates, setWallStates] = useState(Object.fromEntries(OG_WALLS_INIT.map(w => [w.id, { active: true, typeId: w.type }])));
   const [wallFlashSet, setWallFlashSet] = useState(null);
+  const [wallFlashColor, setWallFlashColor] = useState(CI.brightHorizon);
   const wallStatesInitRef = useRef(true);
+  const prevAwRef = useRef(null);
   const [selectedWallId, setSelectedWallId] = useState(null);
   const [extWalls, setExtWalls] = useState(INIT_EXT_WALLS);
   const [selectedExtSide, setSelectedExtSide] = useState(null);
@@ -814,12 +816,19 @@ export default function App() {
 
   useEffect(() => { const iv = setInterval(() => setTick(t => t + 1), 1500); return () => clearInterval(iv); }, []);
   useEffect(() => {
-    if (wallStatesInitRef.current) { wallStatesInitRef.current = false; return; }
+    const currentAw = Object.values(wallStates).filter(v => v.active).length;
+    if (wallStatesInitRef.current) { wallStatesInitRef.current = false; prevAwRef.current = currentAw; return; }
     // Indices of wall-affected KPI cards in the Auswertung grid (must stay in sync with the array below).
     const wallIdx = [0, 1, 3, 4, 5, 6, 11];
     const count = 3 + Math.floor(Math.random() * (wallIdx.length - 2));
     const picked = [...wallIdx].sort(() => Math.random() - 0.5).slice(0, count);
+    // Fewer active walls → larger air volume + less embedded GWP → improvement (green).
+    // More active walls → smaller zones, more material → deterioration (red).
+    const prev = prevAwRef.current ?? currentAw;
+    const color = currentAw < prev ? H.greenDark : currentAw > prev ? CI.pulseRed : CI.brightHorizon;
+    prevAwRef.current = currentAw;
     setWallFlashSet(new Set(picked));
+    setWallFlashColor(color);
     const t = setTimeout(() => setWallFlashSet(null), 1400);
     return () => clearTimeout(t);
   }, [wallStates]);
@@ -1039,7 +1048,7 @@ export default function App() {
                   { l: "PV Dach", v: pvDachOn ? `${params.pvDach} kWp` : "–", c: pvDachOn ? CI.coreBlue : CI.urbanAsh },
                   { l: "PV Freiraum", v: pvFreiraumOn ? `${params.pvFreiraum} kWp` : "–", c: pvFreiraumOn ? CI.brightHorizon : CI.urbanAsh },
                   { l: "Innenwände", v: `${aw}/${OG_WALLS_INIT.length}`, c: CI.urbanAsh, wall: true },
-                ].map((k, i) => { const flash = k.wall && wallFlashSet && wallFlashSet.has(i); return (<div key={i} style={{ background: flash ? `${CI.brightHorizon}22` : "var(--rzz-surface-2)", borderRadius: 12, padding: 14, border: `1px solid ${flash ? CI.brightHorizon : "var(--rzz-border)"}`, boxShadow: flash ? `0 0 18px ${CI.brightHorizon}55` : "none", textAlign: "center", transition: "background 0.7s ease, border-color 0.7s ease, box-shadow 0.7s ease" }}><div style={{ fontSize: 10, color: "var(--rzz-text-dim)", textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600 }}>{k.l}</div><div style={{ fontSize: 22, fontWeight: 700, color: flash ? CI.brightHorizon : k.c, marginTop: 6, letterSpacing: -0.3, transition: "color 0.7s ease" }}>{k.v}</div></div>); })}
+                ].map((k, i) => { const flash = k.wall && wallFlashSet && wallFlashSet.has(i); const fc = wallFlashColor; return (<div key={i} style={{ background: flash ? `${fc}22` : "var(--rzz-surface-2)", borderRadius: 12, padding: 14, border: `1px solid ${flash ? fc : "var(--rzz-border)"}`, boxShadow: flash ? `0 0 18px ${fc}55` : "none", textAlign: "center", transition: "background 0.7s ease, border-color 0.7s ease, box-shadow 0.7s ease" }}><div style={{ fontSize: 10, color: "var(--rzz-text-dim)", textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600 }}>{k.l}</div><div style={{ fontSize: 22, fontWeight: 700, color: flash ? fc : k.c, marginTop: 6, letterSpacing: -0.3, transition: "color 0.7s ease" }}>{k.v}</div></div>); })}
               </div>
             </Box>
           </div>
