@@ -94,3 +94,34 @@ input[type=number]::-webkit-inner-spin-button { opacity: .3; }
 .rzz-mono {
   font-family: 'Geist Mono Variable', 'JetBrains Mono', ui-monospace, monospace;
 }
+
+/* ═══ Hermann live view — soft pastel slider tracks + colored thumbs ═══ */
+.hermann-slider {
+  -webkit-appearance: none;
+  width: 100%;
+  background: #E5E3DC;
+  border-radius: 999px;
+  height: 4px;
+  outline: none;
+}
+.hermann-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #4F7BC4;
+  cursor: pointer;
+  border: 2px solid #FFFFFF;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.18);
+}
+.hermann-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #4F7BC4;
+  cursor: pointer;
+  border: 2px solid #FFFFFF;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.18);
+}
+.hermann-slider.green::-webkit-slider-thumb { background: #7AAA82; }
+.hermann-slider.green::-moz-range-thumb     { background: #7AAA82; }

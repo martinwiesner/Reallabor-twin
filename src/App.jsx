@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { AreaChart, Area, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
 import * as OBC from "@thatopen/components";
 import * as THREE from "three";
 
@@ -519,6 +519,189 @@ function WallSectionVis({ wt }) {
   );
 }
 
+/* ═══ HERMANN LIVE VIEW — pastel dashboard per HermannSuggestion.jpg ═══ */
+const H = {
+  bg:        "#F7F6F2",
+  card:      "#FFFFFF",
+  border:    "#EAE8E0",
+  borderSoft:"#F0EEE6",
+  text:      "#1F2937",
+  textDim:   "#6B7280",
+  textMute:  "#A8ABB0",
+  tintCream: "#FBF1D9",
+  tintCreamD:"#F7E7BF",
+  tintBlue:  "#E9EFF7",
+  tintBlueD: "#D8E2F1",
+  tintGreen: "#E9F0E8",
+  tintGreenD:"#D6E3D4",
+  tintGray:  "#F2F1ED",
+  blue:      "#4F7BC4",
+  blueDark:  "#345893",
+  green:     "#7AAA82",
+  greenDark: "#5C8C66",
+  amber:     "#D9A642",
+  amberDark: "#B7841F",
+};
+
+const IconPV = ({ size = 22, color = H.blueDark }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="3" y="5" width="18" height="13" rx="1.5"/>
+    <line x1="3" y1="9.3" x2="21" y2="9.3"/>
+    <line x1="3" y1="13.6" x2="21" y2="13.6"/>
+    <line x1="9" y1="5" x2="9" y2="18"/>
+    <line x1="15" y1="5" x2="15" y2="18"/>
+    <line x1="8" y1="20" x2="16" y2="20"/>
+  </svg>
+);
+const IconSun = ({ size = 22, color = H.blueDark }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <circle cx="12" cy="12" r="4"/>
+    <path d="M12 2.5v2M12 19.5v2M4.5 4.5l1.4 1.4M18.1 18.1l1.4 1.4M2.5 12h2M19.5 12h2M4.5 19.5l1.4-1.4M18.1 5.9l1.4-1.4"/>
+  </svg>
+);
+const IconBattery = ({ size = 22, color = H.greenDark }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="3" y="7" width="16" height="10" rx="1.5"/>
+    <line x1="21" y1="10" x2="21" y2="14"/>
+    <line x1="11" y1="10" x2="11" y2="14"/>
+    <line x1="9" y1="12" x2="13" y2="12"/>
+  </svg>
+);
+const IconThermo = ({ size = 22, color = H.blueDark }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M14 4.5a2 2 0 0 0-4 0v10.2a4 4 0 1 0 4 0Z"/>
+    <circle cx="12" cy="17" r="1.4" fill={color}/>
+  </svg>
+);
+const IconFan = ({ size = 22, color = H.greenDark }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <circle cx="12" cy="12" r="1.8"/>
+    <path d="M12 4.5c2 0 3 1.5 3 3 0 1.7-1.3 3.5-3 4.5-1.7-1-3-2.8-3-4.5 0-1.5 1-3 3-3Z"/>
+    <path d="M19.5 12c0 2-1.5 3-3 3-1.7 0-3.5-1.3-4.5-3 1-1.7 2.8-3 4.5-3 1.5 0 3 1 3 3Z"/>
+    <path d="M12 19.5c-2 0-3-1.5-3-3 0-1.7 1.3-3.5 3-4.5 1.7 1 3 2.8 3 4.5 0 1.5-1 3-3 3Z"/>
+    <path d="M4.5 12c0-2 1.5-3 3-3 1.7 0 3.5 1.3 4.5 3-1 1.7-2.8 3-4.5 3-1.5 0-3-1-3-3Z"/>
+  </svg>
+);
+const IconDrop = ({ size = 22, color = H.greenDark }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 3 7 10c-1.5 2-1.5 5 0 7s4 2.5 5 2.5 3.5-.5 5-2.5 1.5-5 0-7L12 3Z"/>
+  </svg>
+);
+const IconCloud = ({ size = 22, color = H.blueDark }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M17.5 19a4.5 4.5 0 0 0 0-9 6 6 0 0 0-11.7 1.5A4 4 0 0 0 6 19h11.5Z"/>
+  </svg>
+);
+const IconWaves = ({ size = 22, color = H.amberDark }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M2 9c2.5 0 2.5-2 5-2s2.5 2 5 2 2.5-2 5-2 2.5 2 5 2"/>
+    <path d="M2 15c2.5 0 2.5-2 5-2s2.5 2 5 2 2.5-2 5-2 2.5 2 5 2"/>
+  </svg>
+);
+const IconPlug = ({ size = 22, color = H.textMute }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="5" y="6" width="14" height="13" rx="2"/>
+    <line x1="9" y1="3" x2="9" y2="6"/>
+    <line x1="15" y1="3" x2="15" y2="6"/>
+    <line x1="11" y1="13" x2="13" y2="13"/>
+  </svg>
+);
+
+function hArc(cx, cy, r, startDeg, endDeg) {
+  const polar = (deg) => {
+    const rad = (deg - 90) * Math.PI / 180;
+    return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+  };
+  const s = polar(startDeg), e = polar(endDeg);
+  const large = (endDeg - startDeg) > 180 ? 1 : 0;
+  return `M ${s.x.toFixed(2)} ${s.y.toFixed(2)} A ${r} ${r} 0 ${large} 1 ${e.x.toFixed(2)} ${e.y.toFixed(2)}`;
+}
+
+const HermannGauge = ({ value, max, label, unit, color, bg, Icon }) => {
+  const num = Number(value);
+  const pct = Math.min(100, Math.max(0, (num / Math.max(max, 1)) * 100));
+  const startDeg = 135, sweep = 270;
+  const trackPath = hArc(40, 40, 30, startDeg, startDeg + sweep);
+  const fillPath = pct > 0 ? hArc(40, 40, 30, startDeg, startDeg + (sweep * pct / 100)) : null;
+  return (
+    <div style={{ background: bg, borderRadius: 14, padding: "16px 14px 14px", border: `1px solid ${H.borderSoft}`, display: "flex", flexDirection: "column", alignItems: "stretch", minWidth: 0, position: "relative" }}>
+      <div style={{ position: "absolute", top: 14, left: 14 }}><Icon size={22} color={color} /></div>
+      <div style={{ width: 96, height: 96, margin: "4px auto 6px", position: "relative" }}>
+        <svg width="96" height="96" viewBox="0 0 80 80">
+          <path d={trackPath} stroke="#E3E0D6" strokeWidth="5.5" strokeLinecap="round" fill="none" />
+          {fillPath && <path d={fillPath} stroke={color} strokeWidth="5.5" strokeLinecap="round" fill="none" style={{ transition: "d 0.8s" }} />}
+        </svg>
+        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 700, color: H.text, letterSpacing: -0.3 }}>{value}</div>
+      </div>
+      <div style={{ textAlign: "center", fontSize: 13, color: H.text, fontWeight: 500, marginTop: 2 }}>{label}</div>
+      <div style={{ textAlign: "center", fontSize: 11, color: H.textDim, marginTop: 1 }}>{unit}</div>
+    </div>
+  );
+};
+
+/* Pastel boxes inside the energy-flow card */
+const HSrcCard = ({ Icon, label, value }) => (
+  <div style={{ background: H.tintBlue, borderRadius: 12, padding: "10px 14px", border: `1px solid ${H.borderSoft}`, display: "flex", alignItems: "center", gap: 12 }}>
+    <Icon size={26} color={H.blueDark} />
+    <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.2 }}>
+      <span style={{ fontSize: 12, color: H.textDim, fontWeight: 500 }}>{label}</span>
+      <span style={{ fontSize: 15, color: H.text, fontWeight: 700, marginTop: 2 }}>{value}</span>
+    </div>
+  </div>
+);
+
+const HBigCard = ({ label, value, unit, tint, valueColor, labelColor }) => (
+  <div style={{ background: tint, borderRadius: 12, padding: "14px 12px", border: `1px solid ${H.borderSoft}`, textAlign: "center", display: "flex", flexDirection: "column", justifyContent: "center", minHeight: 96 }}>
+    <div style={{ fontSize: 13, color: labelColor || H.textDim, fontWeight: 500 }}>{label}</div>
+    <div style={{ fontSize: 34, fontWeight: 700, color: valueColor || H.text, letterSpacing: -0.5, lineHeight: 1.05, marginTop: 4 }}>{value}</div>
+    <div style={{ fontSize: 12, color: H.textDim, marginTop: 2 }}>{unit}</div>
+  </div>
+);
+
+const HSocCard = ({ label, value, unit, soc, socColor }) => (
+  <div style={{ background: H.card, borderRadius: 12, padding: "10px 12px", border: `1px solid ${H.borderSoft}`, textAlign: "center" }}>
+    <div style={{ fontSize: 12, color: H.textDim, fontWeight: 500 }}>{label}</div>
+    <div style={{ fontSize: 19, color: H.text, fontWeight: 700, marginTop: 2 }}>{value}</div>
+    <div style={{ fontSize: 11, color: H.textDim }}>{unit}</div>
+    <div style={{ height: 4, background: "#E5E3DC", borderRadius: 2, marginTop: 6, overflow: "hidden" }}>
+      <div style={{ width: `${Math.min(100, Math.max(0, soc))}%`, height: "100%", background: socColor, borderRadius: 2, transition: "width .8s" }} />
+    </div>
+  </div>
+);
+
+function HermannEnergyFlow({ d, p, autarky }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "175px 1fr 1fr 1fr", gap: 16, alignItems: "stretch" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10, justifyContent: "center" }}>
+        <HSrcCard Icon={IconPV} label="PV Dach" value={`${d.pvDach} kW`} />
+        <HSrcCard Icon={IconSun} label="PV Freiraum" value={`${d.pvFrei} kW`} />
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <HBigCard label="Geb. 42" value={d.con42} unit="kW" tint={H.tintGreen} />
+        <HSocCard label="El. Speicher" value={`${d.elStored}/${p.batteryEl}`} unit="kWh" soc={d.elSOC} socColor={H.textMute} />
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <HBigCard label="Geb. 52/53" value={d.con52} unit="kW" tint={H.tintBlue} />
+        <HSocCard label="Th. Speicher" value={`${d.thStored}/${p.batteryTh}`} unit="kWh" soc={d.thSOC} socColor={H.blue} />
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <HBigCard label="Netzbezug" value={d.grid} unit="kW" tint={H.tintCream} valueColor={H.amberDark} labelColor={H.amberDark} />
+        <div style={{ textAlign: "center", padding: "6px 0 4px" }}>
+          <div style={{ fontSize: 10, color: H.textDim, letterSpacing: 1.8, fontWeight: 600 }}>AUTARKIE</div>
+          <div style={{ fontSize: 30, fontWeight: 700, color: H.greenDark, marginTop: 4, letterSpacing: -0.5 }}>{autarky.toFixed(0)}%</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const HCard = ({ children, style }) => (
+  <div style={{ background: H.card, borderRadius: 14, padding: 18, border: `1px solid ${H.border}`, ...style }}>{children}</div>
+);
+const HTitle = ({ children, style }) => (
+  <div style={{ fontSize: 11, color: H.textDim, fontWeight: 600, letterSpacing: 2, textTransform: "uppercase", marginBottom: 14, ...style }}>{children}</div>
+);
+
 /* ═══ ENERGY FLOW ═══
    Sankey-style left → right: sources (left) → consumers (middle) → grid (right),
    with storages directly below their associated building. Pulse Red is reserved
@@ -802,44 +985,85 @@ export default function App() {
         </div>
       </div>
 
-      <div style={{ padding: 10, maxWidth: 1100, margin: "0 auto" }}>
+      <div style={{ padding: view === "live" ? 18 : 10, maxWidth: view === "live" ? 1400 : 1100, margin: "0 auto", background: view === "live" ? H.bg : "transparent", minHeight: view === "live" ? "calc(100vh - 56px)" : "auto" }}>
 
-        {/* ═══ LIVE ═══ */}
-        {view === "live" && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          <Box><Lbl>Energiefluss · Geb. 42 + 52/53</Lbl><EnergyFlow d={cur} p={params} tick={tick} pvDachOn={pvDachOn} pvFreiraumOn={pvFreiraumOn} /></Box>
-          <Box><Lbl>3D · Geb. 42 / 52–53</Lbl><IFCViewer height={280} /></Box>
-          <Box><Lbl>Energieverlauf</Lbl>
-            <ResponsiveContainer width="100%" height={140}>
-              <AreaChart data={hist}>
-                <defs>
-                  <linearGradient id="gP" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={CI.coreBlue} stopOpacity={.55}/><stop offset="100%" stopColor={CI.coreBlue} stopOpacity={0}/></linearGradient>
-                  <linearGradient id="gC" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={CI.urbanAsh} stopOpacity={.35}/><stop offset="100%" stopColor={CI.urbanAsh} stopOpacity={0}/></linearGradient>
-                </defs>
-                <XAxis dataKey="label" tick={{ fill: "var(--rzz-text-dim)", fontSize: 9 }} interval="preserveStartEnd" stroke="var(--rzz-border)" />
-                <YAxis tick={{ fill: "var(--rzz-text-dim)", fontSize: 9 }} width={26} stroke="var(--rzz-border)" />
-                <Tooltip contentStyle={{ background: "var(--rzz-surface-2)", border: "1px solid var(--rzz-border-strong)", borderRadius: 6, fontSize: 10, color: "var(--rzz-text)", fontFamily: "'Geist Variable', sans-serif" }} />
-                <Area type="monotone" dataKey="pvTotal" stroke={CI.coreBlue} fill="url(#gP)" name="PV ges." strokeWidth={1.8} />
-                <Area type="monotone" dataKey="conTotal" stroke={CI.urbanAsh} fill="url(#gC)" name="Verbr. ges." strokeWidth={1.8} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </Box>
-          <Box><Lbl>Parameter</Lbl>
-            {WHAT_IF.map(w => (<div key={w.id} style={{ marginBottom: 9 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 3 }}><span style={{ color: "var(--rzz-text-dim)" }}>{w.label}</span><span style={{ color: "var(--rzz-text)", fontWeight: 700 }} className="rzz-mono">{params[w.id]} {w.unit}</span></div>
-              <input type="range" min={w.min} max={w.max} step={w.step} value={params[w.id]} onChange={e => sp(w.id, e.target.value)} style={{ width: "100%" }} />
-            </div>))}
-          </Box>
-          <Box style={{ gridColumn: "1/-1" }}><Lbl>Sensoren + Speicher · Geb. 42</Lbl>
-            <div style={{ display: "flex", justifyContent: "space-around", flexWrap: "wrap", gap: 6 }}>
-              <Gauge value={sensors.temp} max={40} label="Temp" unit="°C" color={CI.coreBlue} warn={28} />
-              <Gauge value={sensors.humidity} max={100} label="Feuchte" unit="%rH" color={CI.brightHorizon} warn={70} />
-              <Gauge value={sensors.co2} max={1500} label="CO₂" unit="ppm" color={CI.coreBlue} warn={1000} />
-              <Gauge value={sensors.voc} max={500} label="VOC" unit="µg/m³" color={CI.brightHorizon} warn={300} />
-              <Gauge value={cur.thStored} max={params.batteryTh || 1} label="Th. Speicher" unit="kWh" color={CI.coreBlue} />
-              <Gauge value={cur.elStored} max={params.batteryEl || 1} label="El. Speicher" unit="kWh" color={CI.brightHorizon} />
-            </div>
-          </Box>
-        </div>}
+        {/* ═══ LIVE — Hermann design ═══ */}
+        {view === "live" && (() => {
+          const autarky = cur.conTotal > 0 ? Math.min(100, ((1 - cur.grid / cur.conTotal) * 100)) : 100;
+          const paramMeta = {
+            pvDach:      { Icon: IconPV,     tone: "blue"  },
+            pvFreiraum:  { Icon: IconSun,    tone: "blue"  },
+            batteryEl:   { Icon: IconBattery,tone: "green" },
+            batteryTh:   { Icon: IconThermo, tone: "blue"  },
+            ventilation: { Icon: IconFan,    tone: "green" },
+          };
+          const sensorCards = [
+            { value: sensors.temp,     max: 40,                    label: "Temp",        unit: "°C",     color: H.amber,     bg: H.tintCream, Icon: IconThermo },
+            { value: sensors.humidity, max: 100,                   label: "Feuchte",     unit: "%rH",    color: H.green,     bg: H.tintGreen, Icon: IconDrop },
+            { value: sensors.co2,      max: 1500,                  label: "CO₂",         unit: "ppm",    color: H.blue,      bg: H.card,      Icon: IconCloud },
+            { value: sensors.voc,      max: 500,                   label: "VOC",         unit: "µg/m³",  color: H.amberDark, bg: H.tintCream, Icon: IconWaves },
+            { value: cur.thStored,     max: params.batteryTh || 1, label: "Th. Speicher",unit: "kWh",    color: H.blue,      bg: H.tintBlue,  Icon: IconThermo },
+            { value: cur.elStored,     max: params.batteryEl || 1, label: "El. Speicher",unit: "kWh",    color: H.textMute,  bg: H.card,      Icon: IconPlug },
+          ];
+          return (
+          <div style={{ display: "grid", gridTemplateColumns: "1.05fr 0.95fr", gap: 18 }}>
+
+            <HCard>
+              <HTitle>Energiefluss · Geb. 42 + 52/53</HTitle>
+              <HermannEnergyFlow d={cur} p={params} autarky={autarky} />
+            </HCard>
+
+            <HCard style={{ display: "flex", flexDirection: "column", padding: 18, overflow: "hidden" }}>
+              <HTitle>3D · Geb. 42 / 52-53</HTitle>
+              <div style={{ flex: 1, minHeight: 300, borderRadius: 10, overflow: "hidden" }}>
+                <IFCViewer height={300} />
+              </div>
+            </HCard>
+
+            <HCard>
+              <HTitle>Energieverlauf</HTitle>
+              <ResponsiveContainer width="100%" height={220}>
+                <LineChart data={hist} margin={{ top: 8, right: 10, left: -10, bottom: 4 }}>
+                  <CartesianGrid stroke="#EFEDE6" strokeDasharray="0" vertical={false} />
+                  <XAxis dataKey="label" tick={{ fill: H.textDim, fontSize: 11 }} interval="preserveStartEnd" stroke="#EFEDE6" tickLine={false} axisLine={{ stroke: "#EFEDE6" }} />
+                  <YAxis tick={{ fill: H.textDim, fontSize: 11 }} width={34} stroke="#EFEDE6" tickLine={false} axisLine={false} domain={[0, 24]} ticks={[0,6,12,18,24]} />
+                  <Tooltip contentStyle={{ background: H.card, border: `1px solid ${H.border}`, borderRadius: 8, fontSize: 11, color: H.text, fontFamily: "'Geist Variable', sans-serif" }} />
+                  <Legend verticalAlign="top" height={28} iconType="plainline" wrapperStyle={{ fontSize: 12, color: H.textDim, paddingBottom: 6 }} />
+                  <Line type="monotone" dataKey="conTotal" stroke={H.blue} strokeWidth={2.2} dot={false} name="Gesamtverbrauch (kW)" />
+                  <Line type="monotone" dataKey="pvTotal"  stroke={H.green} strokeWidth={2.2} dot={false} name="PV-Erzeugung (kW)" />
+                </LineChart>
+              </ResponsiveContainer>
+            </HCard>
+
+            <HCard>
+              <HTitle>Parameter</HTitle>
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                {WHAT_IF.map(w => {
+                  const m = paramMeta[w.id] || { Icon: IconPV, tone: "blue" };
+                  const Icon = m.Icon;
+                  return (
+                    <div key={w.id} style={{ display: "grid", gridTemplateColumns: "32px 130px 1fr 80px", alignItems: "center", gap: 14 }}>
+                      <div style={{ background: H.tintGray, borderRadius: 8, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <Icon size={18} color={m.tone === "green" ? H.greenDark : H.blueDark} />
+                      </div>
+                      <span style={{ fontSize: 13, color: H.text }}>{w.label}</span>
+                      <input type="range" min={w.min} max={w.max} step={w.step} value={params[w.id]} onChange={e => sp(w.id, e.target.value)} className={`hermann-slider${m.tone === "green" ? " green" : ""}`} />
+                      <span style={{ fontSize: 13, color: H.text, fontWeight: 600, textAlign: "right" }}>{params[w.id]} <span style={{ color: H.textDim, fontWeight: 400 }}>{w.unit}</span></span>
+                    </div>
+                  );
+                })}
+              </div>
+            </HCard>
+
+            <HCard style={{ gridColumn: "1/-1", padding: "16px 18px" }}>
+              <HTitle>Sensoren + Speicher · Geb. 42</HTitle>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 14 }}>
+                {sensorCards.map((s, i) => <HermannGauge key={i} {...s} />)}
+              </div>
+            </HCard>
+
+          </div>);
+        })()}
 
         {/* ═══ CO-DESIGN ═══ */}
         {view === "codesign" && <div style={{ display: "grid", gridTemplateColumns: "1fr 250px", gap: 10 }}>
