@@ -138,8 +138,8 @@ function IFCViewer({ height = 280 }) {
     world.camera = new OBC.SimpleCamera(components);
 
     world.scene.setup();
-    world.scene.three.background = new THREE.Color('#0E0E10');
-    const dir = new THREE.DirectionalLight('#D4E8F7', 0.9);
+    world.scene.three.background = new THREE.Color('#FFFFFF');
+    const dir = new THREE.DirectionalLight('#FFFFFF', 1.1);
     dir.position.set(5, 10, 5);
     world.scene.three.add(dir);
 
@@ -193,7 +193,7 @@ function IFCViewer({ height = 280 }) {
 
   return (
     <div style={{ position: 'relative', width: '100%', height }}>
-      <div ref={containerRef} style={{ width: '100%', height, background: '#0E0E10', borderRadius: 4, overflow: 'hidden' }} />
+      <div ref={containerRef} style={{ width: '100%', height, background: '#FFFFFF', borderRadius: 4, overflow: 'hidden' }} />
       {(loading || error) && (
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
           color: error ? '#EA5738' : '#878787', fontSize: 11, fontFamily: 'inherit', letterSpacing: 1,
@@ -625,7 +625,7 @@ const HermannGauge = ({ value, max, label, unit, color, bg, Icon }) => {
   const fillPath = pct > 0 ? hArc(40, 40, 30, startDeg, startDeg + (sweep * pct / 100)) : null;
   return (
     <div style={{ background: bg, borderRadius: 14, padding: "16px 14px 14px", border: `1px solid ${H.borderSoft}`, display: "flex", flexDirection: "column", alignItems: "stretch", minWidth: 0, position: "relative" }}>
-      <div style={{ position: "absolute", top: 14, left: 14 }}><Icon size={22} color={color} /></div>
+      <div style={{ position: "absolute", top: 14, left: 14 }}><Icon size={30} color={color} /></div>
       <div style={{ width: 96, height: 96, margin: "4px auto 6px", position: "relative" }}>
         <svg width="96" height="96" viewBox="0 0 80 80">
           <path d={trackPath} stroke="#E3E0D6" strokeWidth="5.5" strokeLinecap="round" fill="none" />
