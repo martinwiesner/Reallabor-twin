@@ -1009,6 +1009,28 @@ export default function App() {
           </Box>
 
             <Box style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+              <Lbl>Auswertung · Geb. 42</Lbl>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
+                {[
+                  { l: "GWP gesamt", v: `${(totalGWP/1000).toFixed(1)} t`, c: CI.coreBlue },
+                  { l: "GWP/(m²·a)", v: `${(totalGWP/1500/50).toFixed(3)}`, c: CI.coreBlue },
+                  { l: "U-Wert Außen", v: `${extCalc.uValue.toFixed(3)}`, c: extCalc.uValue < .2 ? okColor : warnColor },
+                  { l: "Therm. Komfort", v: `${sensors.temp}°C`, c: parseFloat(sensors.temp) >= 20 && parseFloat(sensors.temp) <= 26 ? okColor : warnColor },
+                  { l: "VOC", v: `${sensors.voc} µg/m³`, c: parseFloat(sensors.voc) < 200 ? okColor : warnColor },
+                  { l: "Feuchte", v: `${sensors.humidity}%`, c: parseFloat(sensors.humidity) < 65 ? okColor : warnColor },
+                  { l: "CO₂ Raum", v: `${sensors.co2} ppm`, c: parseFloat(sensors.co2) < 1000 ? okColor : warnColor },
+                  { l: "Th. Speicher", v: `${cur.thStored} kWh`, c: CI.brightHorizon },
+                  { l: "El. Speicher", v: `${cur.elStored} kWh`, c: CI.brightHorizon },
+                  { l: "PV Dach", v: pvDachOn ? `${params.pvDach} kWp` : "–", c: pvDachOn ? CI.coreBlue : CI.urbanAsh },
+                  { l: "PV Freiraum", v: pvFreiraumOn ? `${params.pvFreiraum} kWp` : "–", c: pvFreiraumOn ? CI.brightHorizon : CI.urbanAsh },
+                  { l: "Innenwände", v: `${aw}/${OG_WALLS_INIT.length}`, c: CI.urbanAsh },
+                ].map((k, i) => (<div key={i} style={{ background: "var(--rzz-surface-2)", borderRadius: 12, padding: 14, border: "1px solid var(--rzz-border)", textAlign: "center" }}><div style={{ fontSize: 10, color: "var(--rzz-text-dim)", textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600 }}>{k.l}</div><div style={{ fontSize: 22, fontWeight: 700, color: k.c, marginTop: 6, letterSpacing: -0.3 }}>{k.v}</div></div>))}
+              </div>
+            </Box>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+            <Box>
               <Lbl>Wände / PV</Lbl>
               {sel === "dach" ? <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                 <button onClick={() => setPvDachOn(p => !p)} style={{ width: "100%", padding: "7px", borderRadius: 4, border: `1px solid ${pvDachOn ? CI.coreBlue : "var(--rzz-border)"}`, background: pvDachOn ? CI.coreBlue : "transparent", color: pvDachOn ? "#FFFFFF" : "var(--rzz-text-dim)", cursor: "pointer", fontFamily: "inherit", fontSize: 10, fontWeight: 600 }}>PV Dach {pvDachOn ? `aktiv · ${params.pvDach} kWp` : "aus"}</button>
@@ -1031,27 +1053,6 @@ export default function App() {
                   </div>);
                 })}
               </>}
-            </Box>
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-            <Box><Lbl>Auswertung · Geb. 42</Lbl>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
-                {[
-                  { l: "GWP gesamt", v: `${(totalGWP/1000).toFixed(1)} t`, c: CI.coreBlue },
-                  { l: "GWP/(m²·a)", v: `${(totalGWP/1500/50).toFixed(3)}`, c: CI.coreBlue },
-                  { l: "U-Wert Außen", v: `${extCalc.uValue.toFixed(3)}`, c: extCalc.uValue < .2 ? okColor : warnColor },
-                  { l: "Therm. Komfort", v: `${sensors.temp}°C`, c: parseFloat(sensors.temp) >= 20 && parseFloat(sensors.temp) <= 26 ? okColor : warnColor },
-                  { l: "VOC", v: `${sensors.voc} µg/m³`, c: parseFloat(sensors.voc) < 200 ? okColor : warnColor },
-                  { l: "Feuchte", v: `${sensors.humidity}%`, c: parseFloat(sensors.humidity) < 65 ? okColor : warnColor },
-                  { l: "CO₂ Raum", v: `${sensors.co2} ppm`, c: parseFloat(sensors.co2) < 1000 ? okColor : warnColor },
-                  { l: "Th. Speicher", v: `${cur.thStored} kWh`, c: CI.brightHorizon },
-                  { l: "El. Speicher", v: `${cur.elStored} kWh`, c: CI.brightHorizon },
-                  { l: "PV Dach", v: pvDachOn ? `${params.pvDach} kWp` : "–", c: pvDachOn ? CI.coreBlue : CI.urbanAsh },
-                  { l: "PV Freiraum", v: pvFreiraumOn ? `${params.pvFreiraum} kWp` : "–", c: pvFreiraumOn ? CI.brightHorizon : CI.urbanAsh },
-                  { l: "Innenwände", v: `${aw}/${OG_WALLS_INIT.length}`, c: CI.urbanAsh },
-                ].map((k, i) => (<div key={i} style={{ background: "var(--rzz-surface-2)", borderRadius: 12, padding: 14, border: "1px solid var(--rzz-border)", textAlign: "center" }}><div style={{ fontSize: 10, color: "var(--rzz-text-dim)", textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600 }}>{k.l}</div><div style={{ fontSize: 22, fontWeight: 700, color: k.c, marginTop: 6, letterSpacing: -0.3 }}>{k.v}</div></div>))}
-              </div>
             </Box>
             <Box><Lbl>Sensoren + Speicher</Lbl>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
