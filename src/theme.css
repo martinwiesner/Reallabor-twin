@@ -14,19 +14,20 @@
 }
 
 :root[data-theme="light"] {
-  --rzz-bg:          #FFFFFF;
-  --rzz-surface:     var(--rzz-cloud-gray);
+  /* Hermann palette — soft pastel dashboard look across all views */
+  --rzz-bg:          #F7F6F2;
+  --rzz-surface:     #FFFFFF;
   --rzz-surface-2:   #FFFFFF;
-  --rzz-surface-inset:#F4F4F4;
-  --rzz-border:      rgba(135,135,135,0.30);
-  --rzz-border-strong: rgba(135,135,135,0.55);
-  --rzz-text:        var(--rzz-deep-void);
-  --rzz-text-dim:    var(--rzz-urban-ash);
-  --rzz-text-mute:   #B4B4B4;
-  --rzz-primary:     var(--rzz-core-blue);
-  --rzz-primary-2:   var(--rzz-bright-horizon);
-  --rzz-accent-soft: var(--rzz-icy-breeze);
-  --rzz-accent-softer: var(--rzz-soft-sky);
+  --rzz-surface-inset:#F2F1ED;
+  --rzz-border:      #EAE8E0;
+  --rzz-border-strong:#D8D5CC;
+  --rzz-text:        #1F2937;
+  --rzz-text-dim:    #6B7280;
+  --rzz-text-mute:   #A8ABB0;
+  --rzz-primary:     #4F7BC4;
+  --rzz-primary-2:   #345893;
+  --rzz-accent-soft: #E9EFF7;
+  --rzz-accent-softer:#FBF1D9;
   --rzz-alert:       var(--rzz-pulse-red);
   --rzz-mute:        var(--rzz-urban-ash);
   --rzz-on-primary:  #FFFFFF;

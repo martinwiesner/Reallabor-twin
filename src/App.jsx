@@ -3,17 +3,17 @@ import { AreaChart, Area, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveCont
 import * as OBC from "@thatopen/components";
 import * as THREE from "three";
 
-// CI palette tokens — kept as JS constants so we can pass them to SVG/Recharts attributes
-// where CSS variables wouldn't resolve. Mirrors src/theme.css.
+// Palette tokens — remapped to the Hermann pastel scheme so semantic references
+// (FLOORS, DEFAULT_WALL_TYPES, KPI accents, SVG strokes) all match the Live view.
 const CI = {
-  coreBlue:      "#164194",
-  brightHorizon: "#3973B9",
-  icyBreeze:     "#A2D3F3",
-  softSky:       "#D4E8F7",
-  pulseRed:      "#EA5738",
-  cloudGray:     "#E3E3E3",
-  urbanAsh:      "#878787",
-  deepVoid:      "#000000",
+  coreBlue:      "#345893",  // Hermann blueDark
+  brightHorizon: "#4F7BC4",  // Hermann blue
+  icyBreeze:     "#7AA2D1",  // medium blue (visible as stripe / stroke)
+  softSky:       "#A8C4E5",  // light blue
+  pulseRed:      "#D45A4A",  // soft Hermann red for warnings
+  cloudGray:     "#C4C2BC",  // warm medium gray
+  urbanAsh:      "#878787",  // mid gray
+  deepVoid:      "#1F2937",  // Hermann text
 };
 
 // SVG viewBox 0 0 500 250, outer rect x=5 y=5 w=490 h=240, strokeWidth=8 → inner edge ≈ 9/491/9/241
@@ -205,112 +205,6 @@ function IFCViewer({ height = 280 }) {
   );
 }
 
-// Top-down floor-plan view using @thatopen/components Views.createFromIfcStoreys.
-// Spike: renders whatever the library defaults give us (ortho cam + clipping plane
-// per IfcBuildingStorey). Phase B will add ClipEdges + Hider + Highlighter.
-function IFCPlanView({ height = 360, selectedFloorId }) {
-  const containerRef = useRef(null);
-  const stateRef = useRef({ components: null, views: null, storeyViews: [] });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [storeyIds, setStoreyIds] = useState([]);
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-    const container = containerRef.current;
-    const components = new OBC.Components();
-
-    const worlds = components.get(OBC.Worlds);
-    const world = worlds.create();
-    world.scene = new OBC.SimpleScene(components);
-    world.renderer = new OBC.SimpleRenderer(components, container);
-    world.camera = new OBC.SimpleCamera(components);
-
-    world.scene.setup();
-    world.scene.three.background = new THREE.Color('#0E0E10');
-    const dir = new THREE.DirectionalLight('#D4E8F7', 0.9);
-    dir.position.set(5, 10, 5);
-    world.scene.three.add(dir);
-
-    components.init();
-    container.querySelector('[data-thatopen-logo]')?.remove();
-
-    let disposed = false;
-    async function load() {
-      const fragments = components.get(OBC.FragmentsManager);
-      await fragments.init('/reallabor-twin/fragments-worker.mjs');
-
-      const ifcLoader = components.get(OBC.IfcLoader);
-      await ifcLoader.setup({
-        autoSetWasm: false,
-        wasm: { path: '/reallabor-twin/', absolute: true },
-      });
-
-      const resp = await fetch('/reallabor-twin/models/building.ifc');
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const buffer = await resp.arrayBuffer();
-      const model = await ifcLoader.load(new Uint8Array(buffer), true, 'planview');
-      if (disposed) return;
-
-      world.scene.three.add(model.object);
-      model.useCamera(world.camera.three);
-      model.graphicsQuality = 1;
-      world.renderer.onBeforeUpdate.add(() => fragments.core.update());
-      await fragments.core.update(true);
-
-      const views = components.get(OBC.Views);
-      views.world = world;
-      const created = await views.createFromIfcStoreys();
-      console.log('[IFCPlanView] createFromIfcStoreys →', created.map(v => v.id));
-
-      stateRef.current = { components, views, storeyViews: created };
-      setStoreyIds(created.map(v => v.id));
-      setLoading(false);
-    }
-
-    load().catch(err => {
-      console.error('[IFCPlanView]', err);
-      setError(err.message);
-      setLoading(false);
-    });
-
-    return () => { disposed = true; components.dispose(); };
-  }, []);
-
-  // Open the storey view that best matches selectedFloorId (e.g. '1og').
-  useEffect(() => {
-    const { views, storeyViews } = stateRef.current;
-    if (!views || !storeyViews?.length || !selectedFloorId) return;
-    const want = selectedFloorId.toLowerCase();
-    const match =
-      storeyViews.find(v => v.id.toLowerCase().includes(want)) ??
-      storeyViews.find(v => v.id.toLowerCase().includes(want.replace('og', ''))) ??
-      storeyViews[0];
-    views.close();
-    views.open(match.id);
-  }, [selectedFloorId, storeyIds]);
-
-  return (
-    <div style={{ position: 'relative', width: '100%', height }}>
-      <div ref={containerRef} style={{ width: '100%', height, background: '#0E0E10', borderRadius: 4, overflow: 'hidden' }} />
-      {(loading || error) && (
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: error ? '#EA5738' : '#878787', fontSize: 11, fontFamily: 'inherit', letterSpacing: 1,
-          pointerEvents: 'none' }}>
-          {error ? `FEHLER: ${error}` : 'IFC-PLANANSICHT WIRD GELADEN …'}
-        </div>
-      )}
-      {!loading && !error && storeyIds.length > 0 && (
-        <div style={{ position: 'absolute', top: 4, right: 6, fontSize: 9, color: '#878787',
-          background: 'rgba(0,0,0,.55)', padding: '2px 6px', borderRadius: 2,
-          fontFamily: 'inherit', letterSpacing: 0.5, pointerEvents: 'none' }}>
-          {storeyIds.length} Geschoss{storeyIds.length === 1 ? '' : 'e'} · IFC
-        </div>
-      )}
-    </div>
-  );
-}
-
 function genEnergy(tick, p, pvDachOn, pvFreiraumOn) {
   const h = (tick * 0.5) % 24;
   const sun = Math.max(0, Math.sin((h - 6) / 12 * Math.PI));
@@ -384,14 +278,14 @@ const Gauge = ({ value, max, label, unit, color, warn }) => {
   );
 };
 
-const Box = ({ children, style }) => <div style={{ background: "var(--rzz-surface)", borderRadius: 8, padding: 10, border: "1px solid var(--rzz-border)", ...style }}>{children}</div>;
-const Lbl = ({ children, style }) => <div style={{ fontSize: 10, color: "var(--rzz-text-dim)", marginBottom: 6, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", ...style }}>{children}</div>;
+const Box = ({ children, style }) => <div style={{ background: "var(--rzz-surface)", borderRadius: 14, padding: 18, border: "1px solid var(--rzz-border)", ...style }}>{children}</div>;
+const Lbl = ({ children, style }) => <div style={{ fontSize: 11, color: "var(--rzz-text-dim)", marginBottom: 14, fontWeight: 600, letterSpacing: 2, textTransform: "uppercase", ...style }}>{children}</div>;
 
 /* ═══ FLOOR PLANS ═══ */
 function EGPlan({ tick }) {
   const c = CI.coreBlue;
   return (
-    <svg viewBox="0 0 500 250" style={{ width: "100%", background: "var(--rzz-surface-inset)" }}>
+    <svg viewBox="0 0 500 250" style={{ width: "100%", maxWidth: 520, display: "block", margin: "0 auto", background: "var(--rzz-surface-inset)", borderRadius: 8 }}>
       <rect x="5" y="5" width="490" height="240" fill="none" stroke={c} strokeWidth="8" />
       <rect x="120" y="8" width="80" height="100" fill="none" stroke={c} strokeWidth="5" />
       {[30,40,50,60,70].map(y=><line key={y} x1="135" y1={y} x2="175" y2={y} stroke={c+"44"} strokeWidth=".8"/>)}
@@ -411,7 +305,7 @@ function EGPlan({ tick }) {
 function OGPlan({ tick, wallStates, wallTypes, onWallClick, floor, selectedWallId, extWalls, selectedExtSide, onExtSideClick }) {
   const c = floor.color;
   return (
-    <svg viewBox="0 0 500 250" style={{ width: "100%", background: "var(--rzz-surface-inset)" }}>
+    <svg viewBox="0 0 500 250" style={{ width: "100%", maxWidth: 420, display: "block", margin: "0 auto", background: "var(--rzz-surface-inset)", borderRadius: 8 }}>
       {EXT_SIDES.map(s => {
         const ew = extWalls[s.id];
         const wt = wallTypes.find(t => t.id === ew.typeId) || wallTypes.find(t => t.isExterior);
@@ -467,7 +361,7 @@ function OGPlan({ tick, wallStates, wallTypes, onWallClick, floor, selectedWallI
 function RoofPlan({ pvDachOn, onTogglePvDach, pvFreiraumOn, onTogglePvFreiraum, tick }) {
   const sh = .3 + .7 * Math.max(0, Math.sin(((tick * .5) % 24 - 6) / 12 * Math.PI));
   return (
-    <svg viewBox="0 0 500 340" style={{ width: "100%", background: "var(--rzz-surface-inset)" }}>
+    <svg viewBox="0 0 500 340" style={{ width: "100%", maxWidth: 420, display: "block", margin: "0 auto", background: "var(--rzz-surface-inset)", borderRadius: 8 }}>
       {/* Dach PV — Core Blue → Icy Breeze, blue-on-blue per Verlauf */}
       <defs>
         <linearGradient id="pvDachGrad" x1="0" x2="0" y1="0" y2="1">
@@ -981,8 +875,8 @@ export default function App() {
     voc: Math.max(30, (150 + ns(tick * 0.1 + 30, 0.08, 30) - params.ventilation * 0.15)).toFixed(0),
   };
 
-  const okColor = "var(--rzz-primary)"; // brand-blue replaces traffic-light green (CI: no Extra Grün in UI)
-  const warnColor = CI.pulseRed;
+  const okColor = H.greenDark;
+  const warnColor = H.amberDark;
 
   return (
     <div style={{ background: "var(--rzz-bg)", color: "var(--rzz-text)", minHeight: "100vh", fontFamily: "'Geist Variable', system-ui, sans-serif", fontSize: 12 }}>
@@ -1014,7 +908,7 @@ export default function App() {
         </div>
       </div>
 
-      <div style={{ padding: view === "live" ? 18 : 10, maxWidth: view === "live" ? 1400 : 1100, margin: "0 auto", background: view === "live" ? H.bg : "transparent", minHeight: view === "live" ? "calc(100vh - 56px)" : "auto" }}>
+      <div style={{ padding: 18, maxWidth: 1400, margin: "0 auto", background: H.bg, minHeight: "calc(100vh - 56px)" }}>
 
         {/* ═══ LIVE — Hermann design ═══ */}
         {view === "live" && (() => {
@@ -1095,35 +989,26 @@ export default function App() {
         })()}
 
         {/* ═══ CO-DESIGN ═══ */}
-        {view === "codesign" && <div style={{ display: "grid", gridTemplateColumns: "1fr 250px", gap: 10 }}>
-          <div style={{ gridColumn: "1/-1", display: "flex", gap: 2 }}>
-            {FLOORS.map(f => (<button key={f.id} onClick={() => { setSel(f.id); setSelectedWallId(null); }} style={{ padding: "5px 12px", borderRadius: "4px 4px 0 0", border: "1px solid var(--rzz-border)", borderBottom: "none", background: sel === f.id ? "var(--rzz-surface)" : "transparent", color: sel === f.id ? "var(--rzz-text)" : "var(--rzz-text-dim)", fontSize: 10, cursor: "pointer", fontFamily: "inherit", fontWeight: sel === f.id ? 700 : 500, borderTop: sel === f.id ? `2px solid ${f.color}` : "1px solid var(--rzz-border)" }}>{f.short}</button>))}
+        {view === "codesign" && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, alignItems: "stretch" }}>
+          <div style={{ gridColumn: "1/-1", display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {FLOORS.map(f => (<button key={f.id} onClick={() => { setSel(f.id); setSelectedWallId(null); }} style={{ padding: "8px 16px", borderRadius: 10, border: `1px solid ${sel === f.id ? f.color : "var(--rzz-border)"}`, background: sel === f.id ? f.color : "var(--rzz-surface)", color: sel === f.id ? "#FFFFFF" : "var(--rzz-text-dim)", fontSize: 12, cursor: "pointer", fontFamily: "inherit", fontWeight: sel === f.id ? 700 : 500, letterSpacing: 0.4 }}>{sel === f.id ? f.name : f.short}</button>))}
           </div>
 
+          <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
           <Box>
-            <div style={{ fontSize: 12, color: "var(--rzz-text)", marginBottom: 6, fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ width: 10, height: 10, background: fl.color, borderRadius: 2 }} />{fl.name}
+            <div style={{ fontSize: 11, color: "var(--rzz-text-dim)", marginBottom: 14, fontWeight: 600, letterSpacing: 2, textTransform: "uppercase", display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ width: 12, height: 12, background: fl.color, borderRadius: 3 }} />Grundriss · {fl.name}
             </div>
             {sel === "eg" && <EGPlan tick={tick} />}
             {sel === "dach" && <RoofPlan pvDachOn={pvDachOn} onTogglePvDach={() => setPvDachOn(p => !p)} pvFreiraumOn={pvFreiraumOn} onTogglePvFreiraum={() => setPvFreiraumOn(p => !p)} tick={tick} />}
             {!["eg", "dach"].includes(sel) && <>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                <div>
-                  <div style={{ fontSize: 9, color: "var(--rzz-text-dim)", marginBottom: 4, letterSpacing: 1, textTransform: "uppercase" }}>SVG · Stil (Mock)</div>
-                  <OGPlan tick={tick} wallStates={wallStates} wallTypes={wallTypes} onWallClick={onWallClick} floor={fl} selectedWallId={selectedWallId} extWalls={extWalls} selectedExtSide={selectedExtSide} onExtSideClick={onExtSideClick} />
-                </div>
-                <div>
-                  <div style={{ fontSize: 9, color: "var(--rzz-text-dim)", marginBottom: 4, letterSpacing: 1, textTransform: "uppercase" }}>IFC · Views.createFromIfcStoreys (Spike)</div>
-                  <IFCPlanView height={250} selectedFloorId={sel} />
-                </div>
-              </div>
-              <div style={{ fontSize: 9, color: "var(--rzz-text-dim)", marginTop: 5 }}>Klick = auswählen · Doppelklick = ein/aus · {aw}/{OG_WALLS_INIT.length} aktiv</div>
-              <div style={{ display: "flex", gap: 8, marginTop: 5, flexWrap: "wrap" }}>{wallTypes.filter(t => !t.isExterior).map(t => (<span key={t.id} style={{ fontSize: 9, color: "var(--rzz-text-dim)", display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 12, height: 3, background: t.color, borderRadius: 1 }} />{t.name}</span>))}</div>
+              <OGPlan tick={tick} wallStates={wallStates} wallTypes={wallTypes} onWallClick={onWallClick} floor={fl} selectedWallId={selectedWallId} extWalls={extWalls} selectedExtSide={selectedExtSide} onExtSideClick={onExtSideClick} />
+              <div style={{ fontSize: 11, color: "var(--rzz-text-dim)", marginTop: 10 }}>Klick = auswählen · Doppelklick = ein/aus · {aw}/{OG_WALLS_INIT.length} aktiv</div>
+              <div style={{ display: "flex", gap: 14, marginTop: 8, flexWrap: "wrap" }}>{wallTypes.filter(t => !t.isExterior).map(t => (<span key={t.id} style={{ fontSize: 11, color: "var(--rzz-text-dim)", display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 14, height: 3, background: t.color, borderRadius: 1 }} />{t.name}</span>))}</div>
             </>}
           </Box>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <Box style={{ maxHeight: 320, overflowY: "auto" }}>
+            <Box style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
               <Lbl>Wände / PV</Lbl>
               {sel === "dach" ? <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                 <button onClick={() => setPvDachOn(p => !p)} style={{ width: "100%", padding: "7px", borderRadius: 4, border: `1px solid ${pvDachOn ? CI.coreBlue : "var(--rzz-border)"}`, background: pvDachOn ? CI.coreBlue : "transparent", color: pvDachOn ? "#FFFFFF" : "var(--rzz-text-dim)", cursor: "pointer", fontFamily: "inherit", fontSize: 10, fontWeight: 600 }}>PV Dach {pvDachOn ? `aktiv · ${params.pvDach} kWp` : "aus"}</button>
@@ -1146,6 +1031,37 @@ export default function App() {
                   </div>);
                 })}
               </>}
+            </Box>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+            <Box><Lbl>Auswertung · Geb. 42</Lbl>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
+                {[
+                  { l: "GWP gesamt", v: `${(totalGWP/1000).toFixed(1)} t`, c: CI.coreBlue },
+                  { l: "GWP/(m²·a)", v: `${(totalGWP/1500/50).toFixed(3)}`, c: CI.coreBlue },
+                  { l: "U-Wert Außen", v: `${extCalc.uValue.toFixed(3)}`, c: extCalc.uValue < .2 ? okColor : warnColor },
+                  { l: "Therm. Komfort", v: `${sensors.temp}°C`, c: parseFloat(sensors.temp) >= 20 && parseFloat(sensors.temp) <= 26 ? okColor : warnColor },
+                  { l: "VOC", v: `${sensors.voc} µg/m³`, c: parseFloat(sensors.voc) < 200 ? okColor : warnColor },
+                  { l: "Feuchte", v: `${sensors.humidity}%`, c: parseFloat(sensors.humidity) < 65 ? okColor : warnColor },
+                  { l: "CO₂ Raum", v: `${sensors.co2} ppm`, c: parseFloat(sensors.co2) < 1000 ? okColor : warnColor },
+                  { l: "Th. Speicher", v: `${cur.thStored} kWh`, c: CI.brightHorizon },
+                  { l: "El. Speicher", v: `${cur.elStored} kWh`, c: CI.brightHorizon },
+                  { l: "PV Dach", v: pvDachOn ? `${params.pvDach} kWp` : "–", c: pvDachOn ? CI.coreBlue : CI.urbanAsh },
+                  { l: "PV Freiraum", v: pvFreiraumOn ? `${params.pvFreiraum} kWp` : "–", c: pvFreiraumOn ? CI.brightHorizon : CI.urbanAsh },
+                  { l: "Innenwände", v: `${aw}/${OG_WALLS_INIT.length}`, c: CI.urbanAsh },
+                ].map((k, i) => (<div key={i} style={{ background: "var(--rzz-surface-2)", borderRadius: 12, padding: 14, border: "1px solid var(--rzz-border)", textAlign: "center" }}><div style={{ fontSize: 10, color: "var(--rzz-text-dim)", textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600 }}>{k.l}</div><div style={{ fontSize: 22, fontWeight: 700, color: k.c, marginTop: 6, letterSpacing: -0.3 }}>{k.v}</div></div>))}
+              </div>
+            </Box>
+            <Box><Lbl>Sensoren + Speicher</Lbl>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
+                <HermannGauge value={sensors.temp}     max={40}                    label="Temp"         unit="°C"    color={H.amber}     bg={H.tintCream} Icon={IconThermo} />
+                <HermannGauge value={sensors.humidity} max={100}                   label="Feuchte"      unit="%rH"   color={H.green}     bg={H.tintGreen} Icon={IconDrop} />
+                <HermannGauge value={sensors.co2}      max={1500}                  label="CO₂"          unit="ppm"   color={H.blue}      bg={H.card}      Icon={IconCloud} />
+                <HermannGauge value={sensors.voc}      max={500}                   label="VOC"          unit="µg/m³" color={H.amberDark} bg={H.tintCream} Icon={IconWaves} />
+                <HermannGauge value={cur.thStored}     max={params.batteryTh || 1} label="Th. Speicher" unit="kWh"   color={H.blue}      bg={H.tintBlue}  Icon={IconThermo} />
+                <HermannGauge value={cur.elStored}     max={params.batteryEl || 1} label="El. Speicher" unit="kWh"   color={H.textMute}  bg={H.card}      Icon={IconPlug} />
+              </div>
             </Box>
             {selectedExtSide && selSideWT && (() => {
               const sideMeta = EXT_SIDES.find(s => s.id === selectedExtSide);
@@ -1178,50 +1094,14 @@ export default function App() {
                 </div>
               </Box>;
             })()}
-            {selectedWallId && wallStates[selectedWallId]?.active && (() => { const ws = wallStates[selectedWallId], wt = wallTypes.find(t => t.id === ws.typeId); if (!wt) return null; const c = calcWallType(wt);
-              return <Box><Lbl style={{ color: CI.pulseRed }}>{wt.name}</Lbl><WallSectionVis wt={wt} /><div style={{ marginTop: 6, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
-                <div style={{ fontSize: 9, color: "var(--rzz-text-dim)" }}>Dicke: <span className="rzz-mono" style={{ color: "var(--rzz-text)" }}>{c.totalThickness} mm</span></div>
-                <div style={{ fontSize: 9, color: "var(--rzz-text-dim)" }}>U: <span className="rzz-mono" style={{ color: "var(--rzz-text)" }}>{c.uValue.toFixed(3)}</span></div>
-                <div style={{ fontSize: 9, color: "var(--rzz-text-dim)" }}>GWP: <span className="rzz-mono" style={{ color: c.totalGWP < 0 ? CI.coreBlue : CI.pulseRed }}>{c.totalGWP.toFixed(2)}</span></div>
-                <div style={{ fontSize: 9, color: "var(--rzz-text-dim)" }}>VOC: <span className="rzz-mono" style={{ color: "var(--rzz-text)" }}>{c.totalVOC}</span></div>
-              </div></Box>;
-            })()}
           </div>
 
-          <Box style={{ gridColumn: "1/-1" }}><Lbl>Auswertung · Geb. 42</Lbl>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 6 }}>
-              {[
-                { l: "GWP gesamt", v: `${(totalGWP/1000).toFixed(1)} t`, c: CI.coreBlue },
-                { l: "GWP/(m²·a)", v: `${(totalGWP/1500/50).toFixed(3)}`, c: CI.coreBlue },
-                { l: "U-Wert Außen", v: `${extCalc.uValue.toFixed(3)}`, c: extCalc.uValue < .2 ? okColor : warnColor },
-                { l: "Therm. Komfort", v: `${sensors.temp}°C`, c: parseFloat(sensors.temp) >= 20 && parseFloat(sensors.temp) <= 26 ? okColor : warnColor },
-                { l: "VOC", v: `${sensors.voc} µg/m³`, c: parseFloat(sensors.voc) < 200 ? okColor : warnColor },
-                { l: "Feuchte", v: `${sensors.humidity}%`, c: parseFloat(sensors.humidity) < 65 ? okColor : warnColor },
-                { l: "CO₂ Raum", v: `${sensors.co2} ppm`, c: parseFloat(sensors.co2) < 1000 ? okColor : warnColor },
-                { l: "Th. Speicher", v: `${cur.thStored} kWh`, c: CI.brightHorizon },
-                { l: "El. Speicher", v: `${cur.elStored} kWh`, c: CI.brightHorizon },
-                { l: "PV Dach", v: pvDachOn ? `${params.pvDach} kWp` : "–", c: pvDachOn ? CI.coreBlue : CI.urbanAsh },
-                { l: "PV Freiraum", v: pvFreiraumOn ? `${params.pvFreiraum} kWp` : "–", c: pvFreiraumOn ? CI.brightHorizon : CI.urbanAsh },
-                { l: "Innenwände", v: `${aw}/${OG_WALLS_INIT.length}`, c: CI.urbanAsh },
-              ].map((k, i) => (<div key={i} style={{ background: "var(--rzz-surface-2)", borderRadius: 5, padding: 7, border: "1px solid var(--rzz-border)", textAlign: "center" }}><div style={{ fontSize: 8, color: "var(--rzz-text-dim)", textTransform: "uppercase", letterSpacing: 1, fontWeight: 600 }}>{k.l}</div><div className="rzz-mono" style={{ fontSize: 14, fontWeight: 800, color: k.c, marginTop: 2 }}>{k.v}</div></div>))}
-            </div>
-          </Box>
-          <Box style={{ gridColumn: "1/-1" }}><Lbl>Sensoren + Speicher</Lbl>
-            <div style={{ display: "flex", justifyContent: "space-around", flexWrap: "wrap", gap: 6 }}>
-              <Gauge value={sensors.temp} max={40} label="Temp" unit="°C" color={CI.coreBlue} warn={28} />
-              <Gauge value={sensors.humidity} max={100} label="Feuchte" unit="%rH" color={CI.brightHorizon} warn={70} />
-              <Gauge value={sensors.co2} max={1500} label="CO₂" unit="ppm" color={CI.coreBlue} warn={1000} />
-              <Gauge value={sensors.voc} max={500} label="VOC" unit="µg/m³" color={CI.brightHorizon} warn={300} />
-              <Gauge value={cur.thStored} max={params.batteryTh || 1} label="Th. Speicher" unit="kWh" color={CI.coreBlue} />
-              <Gauge value={cur.elStored} max={params.batteryEl || 1} label="El. Speicher" unit="kWh" color={CI.brightHorizon} />
-            </div>
-          </Box>
         </div>}
 
         {/* ═══ MATERIAL ═══ */}
-        {view === "material" && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        {view === "material" && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
           <Box style={{ gridColumn: "1/-1" }}><Lbl>Wandaufbau-Katalog</Lbl>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 10 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 }}>
               {wallTypes.map(wt => { const c = calcWallType(wt); return (
                 <div key={wt.id} style={{ background: "var(--rzz-surface-2)", borderRadius: 6, padding: 11, border: "1px solid var(--rzz-border)", borderLeft: `3px solid ${wt.color}` }}>
                   <div style={{ fontSize: 12, color: "var(--rzz-text)", fontWeight: 700, marginBottom: 6, display: "flex", justifyContent: "space-between" }}><span>{wt.name}</span><span style={{ fontSize: 9, color: "var(--rzz-text-dim)", fontWeight: 500, textTransform: "uppercase", letterSpacing: 1 }}>{wt.isExterior ? "Außen" : "Innen"}</span></div>
