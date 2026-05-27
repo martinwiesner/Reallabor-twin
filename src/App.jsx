@@ -795,6 +795,8 @@ export default function App() {
   const [pvFreiraumOn, setPvFreiraumOn] = useState(true);
   const [wallTypes, setWallTypes] = useState(DEFAULT_WALL_TYPES);
   const [wallStates, setWallStates] = useState(Object.fromEntries(OG_WALLS_INIT.map(w => [w.id, { active: true, typeId: w.type }])));
+  const [wallFlashSet, setWallFlashSet] = useState(null);
+  const wallStatesInitRef = useRef(true);
   const [selectedWallId, setSelectedWallId] = useState(null);
   const [extWalls, setExtWalls] = useState(INIT_EXT_WALLS);
   const [selectedExtSide, setSelectedExtSide] = useState(null);
@@ -811,6 +813,16 @@ export default function App() {
   }, [theme]);
 
   useEffect(() => { const iv = setInterval(() => setTick(t => t + 1), 1500); return () => clearInterval(iv); }, []);
+  useEffect(() => {
+    if (wallStatesInitRef.current) { wallStatesInitRef.current = false; return; }
+    // Indices of wall-affected KPI cards in the Auswertung grid (must stay in sync with the array below).
+    const wallIdx = [0, 1, 3, 4, 5, 6, 11];
+    const count = 3 + Math.floor(Math.random() * (wallIdx.length - 2));
+    const picked = [...wallIdx].sort(() => Math.random() - 0.5).slice(0, count);
+    setWallFlashSet(new Set(picked));
+    const t = setTimeout(() => setWallFlashSet(null), 1400);
+    return () => clearTimeout(t);
+  }, [wallStates]);
   useEffect(() => { setHist(h => [...h.slice(-30), { ...genEnergy(tick, params, pvDachOn, pvFreiraumOn), t: tick }]); }, [tick, params, pvDachOn, pvFreiraumOn]);
 
   // MCP control channel — receives design commands from the meeting assistant
@@ -868,11 +880,14 @@ export default function App() {
   Object.entries(wallStates).forEach(([, ws]) => { if (!ws.active) return; const wt = wallTypes.find(t => t.id === ws.typeId); if (wt) intGWP += calcWallType(wt).totalGWP * 3.5 * 3.2 * 4; });
   const totalGWP = extGWP + intGWP;
 
+  // Interior-wall density factor: more active walls → smaller air zones → less dilution.
+  // Range ≈ -1 (all walls open) … +1 (all walls closed), centered on half-active.
+  const wallFactor = (aw - OG_WALLS_INIT.length / 2) / (OG_WALLS_INIT.length / 2);
   const sensors = {
-    temp: (21 + ns(tick * 0.1, 0.2, 1.5)).toFixed(1),
-    humidity: (48 + ns(tick * 0.1 + 10, 0.15, 8) - params.ventilation * 0.02).toFixed(0),
-    co2: Math.max(400, (620 + ns(tick * 0.1 + 20, 0.12, 150) - params.ventilation * 0.5)).toFixed(0),
-    voc: Math.max(30, (150 + ns(tick * 0.1 + 30, 0.08, 30) - params.ventilation * 0.15)).toFixed(0),
+    temp: (21 + ns(tick * 0.1, 0.2, 1.5) + wallFactor * 0.8).toFixed(1),
+    humidity: (48 + ns(tick * 0.1 + 10, 0.15, 8) - params.ventilation * 0.02 + wallFactor * 5).toFixed(0),
+    co2: Math.max(400, (620 + ns(tick * 0.1 + 20, 0.12, 150) - params.ventilation * 0.5 + wallFactor * 120)).toFixed(0),
+    voc: Math.max(30, (150 + ns(tick * 0.1 + 30, 0.08, 30) - params.ventilation * 0.15 + wallFactor * 35)).toFixed(0),
   };
 
   const okColor = H.greenDark;
@@ -1012,19 +1027,19 @@ export default function App() {
               <Lbl>Auswertung · Geb. 42</Lbl>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
                 {[
-                  { l: "GWP gesamt", v: `${(totalGWP/1000).toFixed(1)} t`, c: CI.coreBlue },
-                  { l: "GWP/(m²·a)", v: `${(totalGWP/1500/50).toFixed(3)}`, c: CI.coreBlue },
+                  { l: "GWP gesamt", v: `${(totalGWP/1000).toFixed(1)} t`, c: CI.coreBlue, wall: true },
+                  { l: "GWP/(m²·a)", v: `${(totalGWP/1500/50).toFixed(3)}`, c: CI.coreBlue, wall: true },
                   { l: "U-Wert Außen", v: `${extCalc.uValue.toFixed(3)}`, c: extCalc.uValue < .2 ? okColor : warnColor },
-                  { l: "Therm. Komfort", v: `${sensors.temp}°C`, c: parseFloat(sensors.temp) >= 20 && parseFloat(sensors.temp) <= 26 ? okColor : warnColor },
-                  { l: "VOC", v: `${sensors.voc} µg/m³`, c: parseFloat(sensors.voc) < 200 ? okColor : warnColor },
-                  { l: "Feuchte", v: `${sensors.humidity}%`, c: parseFloat(sensors.humidity) < 65 ? okColor : warnColor },
-                  { l: "CO₂ Raum", v: `${sensors.co2} ppm`, c: parseFloat(sensors.co2) < 1000 ? okColor : warnColor },
+                  { l: "Therm. Komfort", v: `${sensors.temp}°C`, c: parseFloat(sensors.temp) >= 20 && parseFloat(sensors.temp) <= 26 ? okColor : warnColor, wall: true },
+                  { l: "VOC", v: `${sensors.voc} µg/m³`, c: parseFloat(sensors.voc) < 200 ? okColor : warnColor, wall: true },
+                  { l: "Feuchte", v: `${sensors.humidity}%`, c: parseFloat(sensors.humidity) < 65 ? okColor : warnColor, wall: true },
+                  { l: "CO₂ Raum", v: `${sensors.co2} ppm`, c: parseFloat(sensors.co2) < 1000 ? okColor : warnColor, wall: true },
                   { l: "Th. Speicher", v: `${cur.thStored} kWh`, c: CI.brightHorizon },
                   { l: "El. Speicher", v: `${cur.elStored} kWh`, c: CI.brightHorizon },
                   { l: "PV Dach", v: pvDachOn ? `${params.pvDach} kWp` : "–", c: pvDachOn ? CI.coreBlue : CI.urbanAsh },
                   { l: "PV Freiraum", v: pvFreiraumOn ? `${params.pvFreiraum} kWp` : "–", c: pvFreiraumOn ? CI.brightHorizon : CI.urbanAsh },
-                  { l: "Innenwände", v: `${aw}/${OG_WALLS_INIT.length}`, c: CI.urbanAsh },
-                ].map((k, i) => (<div key={i} style={{ background: "var(--rzz-surface-2)", borderRadius: 12, padding: 14, border: "1px solid var(--rzz-border)", textAlign: "center" }}><div style={{ fontSize: 10, color: "var(--rzz-text-dim)", textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600 }}>{k.l}</div><div style={{ fontSize: 22, fontWeight: 700, color: k.c, marginTop: 6, letterSpacing: -0.3 }}>{k.v}</div></div>))}
+                  { l: "Innenwände", v: `${aw}/${OG_WALLS_INIT.length}`, c: CI.urbanAsh, wall: true },
+                ].map((k, i) => { const flash = k.wall && wallFlashSet && wallFlashSet.has(i); return (<div key={i} style={{ background: flash ? `${CI.brightHorizon}22` : "var(--rzz-surface-2)", borderRadius: 12, padding: 14, border: `1px solid ${flash ? CI.brightHorizon : "var(--rzz-border)"}`, boxShadow: flash ? `0 0 18px ${CI.brightHorizon}55` : "none", textAlign: "center", transition: "background 0.7s ease, border-color 0.7s ease, box-shadow 0.7s ease" }}><div style={{ fontSize: 10, color: "var(--rzz-text-dim)", textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600 }}>{k.l}</div><div style={{ fontSize: 22, fontWeight: 700, color: flash ? CI.brightHorizon : k.c, marginTop: 6, letterSpacing: -0.3, transition: "color 0.7s ease" }}>{k.v}</div></div>); })}
               </div>
             </Box>
           </div>
